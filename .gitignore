@@ -1,0 +1,3 @@
+client_body_temp/
+logs/*.log
+logs/nginx.pid

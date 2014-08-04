@@ -61,7 +61,6 @@ CREATE FUNCTION call(m method, c_path text, body json)
       SELECT regexp_matches(c_path, r.match) INTO pvs;
       req := (json_object(r.params, pvs), body);
     END IF;
-    -- RETURN QUERY EXECUTE 'SELECT * FROM '||quote_ident(r.proc)||'($1)' USING req;
     EXECUTE 'SELECT * FROM '||quote_ident(r.proc)||'($1)' USING req INTO STRICT res;
     RETURN res;
   EXCEPTION

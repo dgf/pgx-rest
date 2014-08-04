@@ -10,16 +10,23 @@ Requirements: only PostgreSQL 9.4 or higher
 
 ## Installation
 
+To install an actual [PostgreSQL][postgres] on Ubuntu or Debian follow these [instructions][pg_apt]
+and use a tagged repository to overrule the libpg version.
+
+    deb http://apt.postgresql.org/pub/repos/apt/ precise-pgdg main 9.4
+
+## Setup
+
 Define a database name in the Makefile or use `rest_check` (the default).
 
 create a fresh database
 ```sh
-make init
+$ make init
 ```
 
 import all examples
 ```sh
-make dashboard
+$ make dashboard
 ```
 
 ## Usage
@@ -80,7 +87,8 @@ CREATE TABLE entity (
   id   serial PRIMARY KEY,
   name text   NOT NULL
 );
-INSERT INTO entity (name) VALUES ('first entity'), ('another one');
+INSERT INTO entity (name)
+VALUES ('first entity'), ('another one');
 ```
 
 create JSON endpoint function
@@ -96,7 +104,8 @@ $$ LANGUAGE plpgsql;
 
 route the endpoint
 ```SQL
-INSERT INTO route (method, path, proc, description) VALUES ('get', '/entities', 'get_entities', 'entity list');
+INSERT INTO route (method, path, proc, description)
+VALUES ('get', '/entities', 'get_entities', 'entity list');
 ```
 
 test the route
@@ -107,4 +116,75 @@ SELECT * FROM get('/entities');
   200 | [{"id":1,"name":"first entity"}, +
       |  {"id":2,"name":"another one"}]
 ```
+
+## HTTP endpoints with OpenResty
+
+Download, build and install an [OpenResty][openresty] release.
+
+create an application user with login
+```SQL
+CREATE USER application WITH NOINHERIT ENCRYPTED PASSWORD 'SecreT';
+GRANT ALL ON ALL TABLES IN SCHEMA public to application;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public to application;
+```
+
+adjust credentials in `nginx.conf`
+```sh
+$ grep postgres_server nginx.conf
+    postgres_server 127.0.0.1 dbname=rest_check user=application password=SecreT;
+```
+
+start Nginx
+```sh
+$ nginx -p `pwd`/ -c nginx.conf
+``` 
+
+a simple task flow example session
+```sh
+# create a task
+$ curl -D - -d '{"subject":"todo", "description":"something"}' http://localhost:8080/task
+HTTP/1.1 201 Created
+Server: openresty/1.7.2.1
+Date: Mon, 04 Aug 2014 18:03:29 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: keep-alive
+
+{"id":1,"status":"open","subject":"todo","description":"something"}%    
+
+# list all open tasks
+$ curl -D - http://localhost:8080/tasks\?status\=open
+HTTP/1.1 200 OK
+Server: openresty/1.7.2.1
+Date: Mon, 04 Aug 2014 18:05:09 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: keep-alive
+
+[{"id":1,"status":"open","subject":"todo","description":"something"}]% 
+
+# finish the task
+$ curl -D - -X POST http://localhost:8080/task/1/finish
+HTTP/1.1 200 OK
+Server: openresty/1.7.2.1
+Date: Mon, 04 Aug 2014 18:06:07 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: keep-alive
+
+{"id":1,"status":"done","subject":"todo","description":"something"}% 
+
+# there are no open tasks
+$ curl -D - http://localhost:8080/tasks\?status\=open
+HTTP/1.1 205 
+Server: openresty/1.7.2.1
+Date: Mon, 04 Aug 2014 18:37:38 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: keep-alive
+```
+
+[openresty]: http://openresty.org/
+[postgres]: http://www.postgresql.org/
+[pg_apt]: http://wiki.postgresql.org/wiki/Apt
 
