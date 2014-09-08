@@ -37,9 +37,6 @@ CREATE FUNCTION get_contact(req request)
     FROM contact c JOIN address a ON c.address_id = a.id
     WHERE c.id = (req.params->>'id')::int INTO STRICT r;
     RETURN (200, to_json(r));
-  EXCEPTION
-    WHEN no_data_found THEN
-      RETURN (404, to_json((SQLSTATE, SQLERRM)::error));
   END;
 $$ LANGUAGE plpgsql;
 
@@ -84,8 +81,6 @@ CREATE FUNCTION put_contact(req request)
   EXCEPTION
     WHEN integrity_constraint_violation THEN
       RETURN (400, to_json((SQLSTATE, SQLERRM)::error));
-    WHEN no_data_found THEN
-      RETURN (404, to_json((SQLSTATE, SQLERRM)::error));
   END;
 $$ LANGUAGE plpgsql;
 
@@ -106,8 +101,6 @@ CREATE FUNCTION put_contact_address(req request)
   EXCEPTION
     WHEN integrity_constraint_violation THEN
       RETURN (400, to_json((SQLSTATE, SQLERRM)::error));
-    WHEN no_data_found THEN
-      RETURN (404, to_json((SQLSTATE, SQLERRM)::error));
   END;
 $$ LANGUAGE plpgsql;
 
@@ -126,9 +119,6 @@ CREATE FUNCTION delete_contact(req request)
   BEGIN
     c := delete_contact((req.params->>'id')::int);
     RETURN (204, to_json(c));
-  EXCEPTION
-    WHEN no_data_found THEN
-      RETURN (404, to_json((SQLSTATE, SQLERRM)::error));
   END;
 $$ LANGUAGE plpgsql;
 

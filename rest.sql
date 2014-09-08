@@ -17,19 +17,19 @@ CREATE TYPE request AS (
 
 -- HTTP response
 CREATE TYPE response AS (
-  code        int, -- HTTP status code like 201, 404, 500
-  data        json -- JSON result object or error message
+  code        int,  -- HTTP status code like 201, 404, 500
+  data        json  -- JSON result object or error message
 );
 
 -- HTTP route
 CREATE TABLE route (
   id          serial PRIMARY KEY,
   method      method NOT NULL DEFAULT 'get',
-  path        text   NOT NULL,
-  proc        text   NOT NULL,
+  path        text   NOT NULL, -- request path with params
+  proc        text   NOT NULL, -- function to call
   description text   NOT NULL,
-  params      text[] NOT NULL,
-  match       text   NOT NULL
+  params      text[] NOT NULL, -- param array (extracted from path)
+  match       text   NOT NULL  -- prepared regexp match
 );
 
 -- prepare route path matches
@@ -64,9 +64,12 @@ CREATE FUNCTION call(m method, c_path text, body json)
     EXECUTE 'SELECT * FROM '||quote_ident(r.proc)||'($1)' USING req INTO STRICT res;
     RETURN res;
   EXCEPTION
+    WHEN no_data_found THEN RETURN (404, to_json((SQLSTATE, SQLERRM)::error));
     WHEN OTHERS THEN RETURN (500, to_json((SQLSTATE, SQLERRM)::error));
   END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+   -- This grants the access to all published routes!
+   SECURITY DEFINER;
 
 -- call a GET route
 CREATE FUNCTION get(path text)
