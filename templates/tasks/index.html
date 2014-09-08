@@ -1,0 +1,22 @@
+{(header.html)}
+  <h1>{{title}}</h1>
+  <a href="{*data.routes.post*}">create a task</a>
+  <table>
+    <thead>
+      <tr>
+        <th>status</th>
+        <th>subject</th>
+        <th>description</th>
+      <tr>
+    </thead>
+    <tbody>
+{% for _, task in ipairs(data.tasks) do %}
+      <tr>
+        <td>{{task.status}}</td>
+        <td><a href="{{task.routes.get}}">{{task.subject}}</a></td>
+        <td>{{task.description}}</td>
+      </tr>
+{% end %}
+    </tbody>
+  </table>
+{(footer.html)}

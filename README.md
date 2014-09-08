@@ -41,16 +41,18 @@ make cli
 list all existing routes
 ```SQL
 SELECT method, path, proc, description FROM route ORDER by path, method;
- method |          path          |        proc         |      description       
---------+------------------------+---------------------+------------------------
+ method |          path          |        proc         |             description
+--------+------------------------+---------------------+--------------------------------------
+ get    | /                      | get_dashboard       | index page
  post   | /contact               | post_contact        | create a contact
  get    | /contact/{id}          | get_contact         | contact details
  put    | /contact/{id}          | put_contact         | update contact details
  delete | /contact/{id}          | delete_contact      | delete a contact
  put    | /contact/{id}/address  | put_contact_address | update contact address
  get    | /contacts              | get_contacts        | contact list
- get    | /dashboard             | get_dashboard       | index page
+ get    | /task                  | create_task_form    | template route of task creation form
  post   | /task                  | post_task           | create a task
+ get    | /task/{id}             | get_task            | get task details
  put    | /task/{id}             | put_task            | update a task
  delete | /task/{id}             | delete_task         | delete a task
  post   | /task/{id}/cancel      | post_task_cancel    | cancel a task
@@ -58,7 +60,7 @@ SELECT method, path, proc, description FROM route ORDER by path, method;
  post   | /task/{id}/reopen      | post_task_reopen    | reopen a task
  get    | /tasks                 | get_tasks           | all tasks
  get    | /tasks?status={status} | get_tasks           | filter tasks
-(15 rows)
+(17 rows)
 ```
 
 create a new task
@@ -75,7 +77,7 @@ get all open tasks
 SELECT data FROM get('/tasks?status=open');
                                  data                                  
 -----------------------------------------------------------------------
- [{"id":1,"status":"open","subject":"todo","description":"something"}]
+ [{"id":1,"status":"open","subject":"todo","description":"something ...
 (1 row)
 ```
 
@@ -124,8 +126,6 @@ Download, build and install an [OpenResty][openresty] release.
 create an application user with login
 ```SQL
 CREATE USER application WITH NOINHERIT ENCRYPTED PASSWORD 'SecreT';
-GRANT ALL ON ALL TABLES IN SCHEMA public to application;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public to application;
 ```
 
 adjust credentials in `nginx.conf`
@@ -142,26 +142,26 @@ $ nginx -p `pwd`/ -c nginx.conf
 a simple task flow example session
 ```sh
 # create a task
-$ curl -D - -d '{"subject":"todo", "description":"something"}' http://localhost:8080/task
+$ curl -D - -H "Content-Type: application/json" -d '{"subject":"todo", "description":"something"}' http://localhost:8080/task
 HTTP/1.1 201 Created
 Server: openresty/1.7.2.1
-Date: Mon, 04 Aug 2014 18:03:29 GMT
+Date: Mon, 08 Sep 2014 18:43:00 GMT
 Content-Type: application/json
 Transfer-Encoding: chunked
 Connection: keep-alive
 
-{"id":1,"status":"open","subject":"todo","description":"something"}%    
+{"id" : 1, "status" : "open", "subject" : "todo", "description" : "something", "routes" : {"delete" : "/task/1", "get" : "/task/1", "put" : "/task/1"}}%
 
 # list all open tasks
 $ curl -D - http://localhost:8080/tasks\?status\=open
 HTTP/1.1 200 OK
 Server: openresty/1.7.2.1
-Date: Mon, 04 Aug 2014 18:05:09 GMT
+Date: Mon, 08 Sep 2014 18:43:28 GMT
 Content-Type: application/json
 Transfer-Encoding: chunked
 Connection: keep-alive
 
-[{"id":1,"status":"open","subject":"todo","description":"something"}]% 
+{"tasks" : [{"id" : 1, "status" : "open", "subject" : "todo", "description" : "something", "routes" : {"delete" : "/task/1", "get" : "/task/1", "put" : "/task/1"}}], "routes" : {"post" : "/task"}}%
 
 # finish the task
 $ curl -D - -X POST http://localhost:8080/task/1/finish
@@ -176,15 +176,60 @@ Connection: keep-alive
 
 # there are no open tasks
 $ curl -D - http://localhost:8080/tasks\?status\=open
-HTTP/1.1 205 
+HTTP/1.1 200 OK
 Server: openresty/1.7.2.1
-Date: Mon, 04 Aug 2014 18:37:38 GMT
+Date: Mon, 08 Sep 2014 18:44:26 GMT
 Content-Type: application/json
 Transfer-Encoding: chunked
 Connection: keep-alive
+
+{"tasks" : [], "routes" : {"post" : "/task"}}%
+
+# POST a x-www-form-urlencoded task
+$ curl -D - -d 'subject=todo2&description=something2' http://localhost:8080/task
+HTTP/1.1 201 Created
+Server: openresty/1.7.2.1
+Date: Mon, 08 Sep 2014 18:45:02 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: keep-alive
+
+{"id" : 2, "status" : "open", "subject" : "todo2", "description" : "something2", "routes" : {"delete" : "/task/2", "get" : "/task/2", "put" : "/task/2"}}%
 ```
 
-[openresty]: http://openresty.org/
+### Templates
+
+requires [lua-resty-template][lua-resty-template], the simplest way to install it is `luarocks`
+```sh
+sudo luarocks install lua-resty-template
+```
+
+list all template mappings
+```SQL
+SELECT proc, mime, path, locals FROM template;
+       proc       | mime |        path        |          locals
+------------------+------+--------------------+---------------------------
+ get_task         | html | tasks/details.html | {"title":"task details"}
+ get_tasks        | html | tasks/index.html   | {"title":"task list"}
+ get_tasks        | svg  | tasks/stats.svg    | {"title":"task stats"}
+ create_task_form | html | tasks/create.html  | {"title":"create a task"}
+(4 rows)
+```
+
+### HTML HTTP REST Hacks for ROCA
+
+The lack of HTTP methods in HTML often has effects on the REST interface.
+
+#### POST HTML form HTTP redirect
+
+A 201 POST response is rewritten to a 303 with the `routes.get` URI.
+
+#### PUT HTML form template redirect
+
+A 200 PUT response and the GET of a resource shares the same URI and JSON structure like `/task/3`.
+
 [postgres]: http://www.postgresql.org/
 [pg_apt]: http://wiki.postgresql.org/wiki/Apt
+[openresty]: http://openresty.org/
+[lua-resty-template]: https://github.com/bungle/lua-resty-template
 

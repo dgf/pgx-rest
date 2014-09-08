@@ -13,6 +13,38 @@ DO $$
       PERFORM create_task('keep on going', 'live every day to its fullest');
     END;
 
+    -- TEST SQL template function
+    BEGIN
+      RAISE INFO 'find tasks HTML template';
+      SELECT json_build_object('path', path, 'locals', locals) FROM find_template('html', '/tasks') INTO ref;
+      IF ref->>'path' != 'tasks/index.html' THEN
+        RAISE 'tasks HTML template expected, got: %', ref;
+      ELSE
+        RAISE INFO 'OK: %', ref;
+      END IF;
+    END;
+
+    BEGIN
+      RAISE INFO 'find tasks SVG template';
+      SELECT json_build_object('path', path, 'locals', locals) FROM find_template('svg', '/tasks?status=test') INTO ref;
+      IF ref->>'path' != 'tasks/stats.svg' THEN
+        RAISE 'tasks SVG template expected, got: %', ref;
+      ELSE
+        RAISE INFO 'OK: %', ref;
+      END IF;
+    END;
+
+    BEGIN
+      RAISE INFO 'find an unknown template';
+      SELECT json_build_object('path', path) FROM find_template('html', '/unknown') INTO ref;
+      IF ref->>'path' != 'null' THEN
+        RAISE 'NULL expected, got: %', ref;
+      ELSE
+        RAISE INFO 'OK: %', ref;
+      END IF;
+    END;
+
+    -- TEST CRUDL task routes
     BEGIN
       RAISE INFO 'POST 400 /task';
       SELECT * FROM post('/task', '{"subject": "to", "description": "do"}'::json) INTO res;
@@ -39,6 +71,16 @@ DO $$
     ref := res.data;
 
     BEGIN
+      RAISE INFO 'GET 200 /task';
+      SELECT * FROM get('/task/'||(ref->>'id')) INTO res;
+      IF res.code != 200 OR (res.data->>'id') <> (ref->>'id') THEN
+        RAISE 'task details found expected, got: % %', res.code, res.data;
+      ELSE
+        RAISE INFO 'OK: % %', res.code, res.data;
+      END IF;
+    END;
+
+    BEGIN
       RAISE INFO 'PUT 404 /task';
       SELECT * FROM put('/task/'||nextval('task_id_seq'), '{"subject":0}'::json) INTO res;
       IF res.code != 404 THEN
@@ -51,10 +93,10 @@ DO $$
     BEGIN
       RAISE INFO 'PUT 200 /task';
       SELECT * FROM put('/task/'||(ref->>'id'), '{"subject": "todo", "description": "something else"}'::json) INTO res;
-      IF res.code != 200 OR res.data->>'description' <> 'something else' THEN
-        RAISE 'updated task expected, got: % %', res.code, res.data;
-      ELSE
+      IF res.code = 200 AND (res.data->'task'->>'description') = 'something else' THEN
         RAISE INFO 'OK: % %', res.code, res.data;
+      ELSE
+        RAISE 'updated task expected, got: % %', res.code, res.data;
       END IF;
     END;
 
@@ -121,7 +163,7 @@ DO $$
     BEGIN
       RAISE INFO 'GET 200 /tasks';
       SELECT * FROM get('/tasks') INTO res;
-      IF res.code != 200 OR json_array_length(res.data) != 2 THEN
+      IF res.code != 200 OR json_array_length(res.data->'tasks') != 2 THEN
         RAISE 'task list expected, got: % %', res.code, res.data;
       ELSE
         RAISE INFO '% %', res.code, res.data;
@@ -131,8 +173,18 @@ DO $$
     BEGIN
       RAISE INFO 'GET 200 /tasks?status=open';
       SELECT * FROM get('/tasks?status=open') INTO res;
-      IF res.code != 200 OR json_array_length(res.data) != 1 THEN
+      IF res.code != 200 OR json_array_length(res.data->'tasks') != 1 THEN
         RAISE 'open task list expected, got: % %', res.code, res.data;
+      ELSE
+        RAISE INFO '% %', res.code, res.data;
+      END IF;
+    END;
+
+    BEGIN
+      RAISE INFO 'GET 200 /tasks?status=done';
+      SELECT * FROM get('/tasks?status=done') INTO res;
+      IF res.code != 200 OR json_array_length(res.data->'tasks') != 0 THEN
+        RAISE 'empty open task list expected, got: % %', res.code, res.data;
       ELSE
         RAISE INFO '% %', res.code, res.data;
       END IF;
@@ -148,6 +200,7 @@ DO $$
       END IF;
     END;
 
+    -- TEST CRUDL contact routes
     BEGIN
       RAISE INFO 'POST 400 /contact';
       SELECT * FROM
@@ -230,9 +283,10 @@ DO $$
       END IF;
     END;
 
+    -- TEST dashboard
     BEGIN
-      RAISE INFO 'GET 200 /dashboard';
-      SELECT * FROM get('/dashboard') INTO res;
+      RAISE INFO 'GET 200 /';
+      SELECT * FROM get('/') INTO res;
       IF res.code != 200 THEN
         RAISE 'dashboard content expected, got: % %', res.code, res.data;
       ELSE
@@ -240,6 +294,7 @@ DO $$
       END IF;
     END;
 
+  RAISE INFO 'OK ;-)';
   END;
 $$;
 ROLLBACK;

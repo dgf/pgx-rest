@@ -1,0 +1,1 @@
+Nginx public asset directory

@@ -50,6 +50,37 @@ CREATE FUNCTION route_path_match()
 $$ LANGUAGE plpgsql;
 CREATE TRIGGER route_path_match BEFORE INSERT OR UPDATE ON route FOR EACH ROW EXECUTE PROCEDURE route_path_match();
 
+-- create a route action URI with params
+CREATE FUNCTION route_action(m method, a_proc text, a_params text[])
+  RETURNS text AS $$ DECLARE r route; path text; param text; i int;
+  BEGIN
+    SELECT * FROM route
+    WHERE m = method
+      AND a_proc = proc
+      AND array_length(a_params, 1) = array_length(params, 1)
+    INTO STRICT r;
+    path := r.path;
+    FOR i IN array_lower(a_params, 1) .. array_upper(a_params, 1)
+    LOOP -- replace all params by key
+      path := regexp_replace(path, '({'||r.params[i]||'})', a_params[i]);
+    END LOOP;
+    RETURN path;
+  END;
+$$ LANGUAGE plpgsql;
+
+-- create a route action URI without params
+CREATE FUNCTION route_action(m method, a_proc text)
+  RETURNS text AS $$ DECLARE r route; path text;
+  BEGIN
+    SELECT * FROM route
+    WHERE m = method
+      AND a_proc = proc
+      AND array_length(params, 1) IS NULL
+    INTO STRICT r;
+    RETURN r.path;
+  END;
+$$ LANGUAGE plpgsql;
+
 -- route an endpoint call
 CREATE FUNCTION call(m method, c_path text, body json)
   RETURNS response AS $$ DECLARE r route; res response; req request; pns text[]; pvs text[];

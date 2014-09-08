@@ -1,0 +1,20 @@
+{(header.html)}
+  <form action="{*data.task.routes.put*}" method="post">
+    <input name="method" type="hidden" value="put">
+{% if data.notice then %}
+    <div class="notice {{data.notice.level}}">{{data.notice.message}}</div>
+{% end %}
+    <div class="row">
+      <label>Subject</label>
+      <input required name="subject" value="{{data.task.subject}}">
+    </div>
+    <div class="row">
+      <label>Description</label>
+      <textarea name="description">{{data.task.description}}</textarea>
+    </div>
+    <div class="row">
+      <a href="{*data.routes.list*}">List all tasks</a>
+      <button type="submit">Save</button>
+    </div>
+  </form>
+{(footer.html)}

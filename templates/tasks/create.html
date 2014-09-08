@@ -1,0 +1,16 @@
+{(header.html)}
+  <form action="{*data.routes.post*}" method="post">
+    <div class="row">
+      <label>Subject</label>
+      <input required name="subject" placeholder="{{data.placeholder.subject}}">
+    </div>
+    <div class="row">
+      <label>Description</label>
+      <textarea name="description" placeholder="{{data.placeholder.description}}"></textarea>
+    </div>
+    <div class="row">
+      <a href="{*data.routes.list*}">List all tasks</a>
+      <button type="submit">Create</button>
+    </div>
+  </form>
+{(footer.html)}

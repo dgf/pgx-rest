@@ -12,10 +12,13 @@ clean:
 rest: clean
 	psql $(db_name) -f rest.sql
 
-tasks: rest
+template: rest
+	psql $(db_name) -f template.sql
+
+tasks: template
 	psql $(db_name) -f tasks.sql
 
-contacts: rest
+contacts: template
 	psql $(db_name) -f contacts.sql
 
 dashboard: contacts tasks
