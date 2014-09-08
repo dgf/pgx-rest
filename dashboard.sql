@@ -1,7 +1,7 @@
 -- dashboard endpoint with open tasks and contact list
 
 INSERT INTO route (method, path, proc, description) VALUES
-('get', '/dashboard', 'get_dashboard', 'index page');
+('get', '/', 'get_dashboard', 'index page');
 
 CREATE FUNCTION get_dashboard(req request)
   RETURNS response AS $$ DECLARE tasks json; contacts json;
