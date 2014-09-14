@@ -81,6 +81,24 @@ CREATE FUNCTION route_action(m method, a_proc text)
   END;
 $$ LANGUAGE plpgsql;
 
+-- list all routes
+INSERT INTO route (method, path, proc, description) VALUES
+('get', '/routes', 'get_routes', 'list all published routes');
+CREATE FUNCTION get_routes(req request)
+  RETURNS response AS $$ DECLARE routes json;
+  BEGIN
+    SELECT json_agg(json_build_object(
+      'path', r.path
+    , 'method', r.method
+    , 'proc', r.proc
+    , 'params', r.params
+    , 'description', r.description)
+    ORDER BY r.path, r.method)
+    FROM route r INTO routes;
+    RETURN (200, json_build_object('routes', routes));
+  END;
+$$ LANGUAGE plpgsql;
+
 -- route an endpoint call
 CREATE FUNCTION call(m method, c_path text, body json)
   RETURNS response AS $$ DECLARE r route; res response; req request; pns text[]; pvs text[];
