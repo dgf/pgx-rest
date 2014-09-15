@@ -11,14 +11,14 @@
 {% for _, t in ipairs(data.templates) do %}
       <tr>
         <td>{{t.mime:upper()}}</td>
-        <td>{{t.path}}</td>
+        <td>{*t.path*}</td>
         <td>
           <ul class="routes">
 {% for _, r in ipairs(t.routes) do %}
 {% if t.mime == 'html' and #r.params == 0 then %}
-            <li><a href="{*r.path*}">{{r.path}}</a></li>
+            <li><a href="{*r.path*}">{*r.path*}</a></li>
 {% else %}
-            <li>{{r.path}}</li>
+            <li>{*r.path*}</li>
 {% end %}
 {% end %}
           </ul>

@@ -12,9 +12,9 @@
 {% for _, route in ipairs(data.routes) do %}
       <tr>
 {% if route.method == 'get' and #route.params == 0 then %}
-        <td><a href="{*route.path*}">{{route.path}}</a></td>
+        <td><a href="{*route.path*}">{*route.path*}</a></td>
 {% else %}
-        <td>{{route.path}}</td>
+        <td>{*route.path*}</td>
 {% end %}
         <td>{{route.method:upper()}}</td>
 {% if route.method == 'get' and #route.params == 0 then %}

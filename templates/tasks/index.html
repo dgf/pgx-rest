@@ -13,7 +13,7 @@
 {% for _, task in ipairs(data.tasks) do %}
       <tr>
         <td>{{task.status}}</td>
-        <td><a href="{{task.routes.get}}">{{task.subject}}</a></td>
+        <td><a href="{*task.routes.get*}">{{task.subject}}</a></td>
         <td>{{task.description}}</td>
         <td>
           <ul class="actions">
