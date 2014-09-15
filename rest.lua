@@ -8,21 +8,26 @@ local mime_types = {
   svg = "image/svg+xml"
 }
 
--- get uri, query, method and fix body
+-- get uri, query, method, args, ...
 local uri = ngx.var.uri
+local referer = ngx.req.get_headers().referer
 local ctype = ngx.req.get_headers().content_type
 local accept = ngx.req.get_headers().accept
 local method = string.lower(ngx.req.get_method())
-local args = ngx.encode_args(ngx.req.get_uri_args())
+local pargs = ngx.req.get_post_args()
 local body = ngx.req.get_body_data()
+
+-- concat uri args
+local args = ngx.encode_args(ngx.req.get_uri_args())
 if args and #args > 2 then uri = uri .. "?" .. args end
 
--- encode HTML form requests and rewrite HTTP POST request to route method (only PUT)
+-- encode HTML form requests
 if ctype == "application/x-www-form-urlencoded" then
-  local pargs = ngx.req.get_post_args()
   body = cjson.encode(pargs)
-  if method == "post" and pargs.method then
-    method = "put" -- change request method
+
+  -- rewrite HTTP POST request to route method (only PUT and DELETE)
+  if method == "post" and (pargs.method == "put" or pargs.method == "delete") then
+    method = pargs.method -- change request method
   end
 end
 
@@ -68,10 +73,28 @@ if response.data ~= parser.null then
     template.render("error.html", value)
 
   -- rewrite successful POST requests
-  elseif response.code == 201 and ctype == "application/x-www-form-urlencoded" then
-      local entitiy = cjson.decode(response.data)
-      ngx.status = 303 -- redirect POST response
-      ngx.header.location = entitiy.routes.get
+  elseif method == "post" and response.code < 300 and ctype == "application/x-www-form-urlencoded" then
+    local data = cjson.decode(response.data)
+    ngx.status = 303 -- redirect POST response
+
+    -- use optional hidden input 'back' value
+    if pargs.back then
+      ngx.header.location = pargs.back
+
+    -- or use optional response GET route
+    elseif data.routes and data.routes.get then
+      ngx.header.location = data.routes.get
+
+    -- or the original referer (fallback)
+    else
+      ngx.header.location = referer
+    end
+
+  -- rewrite successful DELETE requests
+  elseif method == "delete" and response.code < 300 and ctype == "application/x-www-form-urlencoded" then
+    local data = cjson.decode(response.data)
+    ngx.status = 303 -- redirect DELETE response
+    ngx.header.location = data.routes.next
 
   -- query and render template
   else
@@ -83,12 +106,25 @@ if response.data ~= parser.null then
     if body and body.resultset and #body.resultset == 1 then
       path = body.resultset[1].path
     end
-    if path == cjson.null then -- no template found > return JSON
+
+    -- no template found > return JSON
+    if path == cjson.null then
       ngx.status = response.code
       ngx.print(response.data)
-    else -- render template with locals and response data
+
+    -- render template with locals and response data
+    else
       local value = cjson.decode(body.resultset[1].locals)
       value.data = cjson.decode(response.data)
+
+      -- add the back route action
+      if value.data.routes then
+        value.data.routes.back = referer
+      else
+        value.data.routes = { back = referer }
+      end
+
+      -- set headers and render template
       ngx.header.content_type = mime_types[mime]
       ngx.status = response.code
       template.render(path, value)
