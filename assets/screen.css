@@ -6,28 +6,65 @@ form {
 }
 
 .notice {
-  background-color: gray;
-  padding-bottom: .7em;
+  background-color: lightgray;
+  margin-bottom: .7em;
+  width: 300px;
 }
 
-.row {
+.notice.error {
+  background-color: lightcoral;
+}
+
+.notice.info {
+  background-color: lightgreen;
+}
+
+.notice.warn {
+  background-color: lightyellow;
+}
+
+form .row {
+  clear: both;
   padding-bottom: .3em;
 }
 
-label {
-  width: 100px;
+form .row button {
+  float: right;
 }
 
-input {
+form .row label input {
   float: right;
   width: 200px;
 }
 
-textarea {
+form .row label span {
+  float: right;
+  font-weight: bold;
+  width: 200px;
+}
+
+form .row label textarea {
   width: 300px;
 }
 
-button {
+form .row ul {
   float: right;
+  width: 200px;
+}
+
+ul.actions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+ul.actions li {
+  display: inline;
+}
+
+ul.routes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
