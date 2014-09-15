@@ -1,12 +1,14 @@
 {(header.html)}
   <form action="{*data.routes.post*}" method="post">
     <div class="row">
-      <label>Subject</label>
-      <input required name="subject" placeholder="{{data.placeholder.subject}}">
+      <label>Subject
+        <input required name="subject" placeholder="{{data.placeholder.subject}}">
+      </label>
     </div>
     <div class="row">
-      <label>Description</label>
-      <textarea name="description" placeholder="{{data.placeholder.description}}"></textarea>
+      <label>Description
+        <textarea name="description" placeholder="{{data.placeholder.description}}"></textarea>
+      </label>
     </div>
     <div class="row">
       <a href="{*data.routes.list*}">List all tasks</a>

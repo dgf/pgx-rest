@@ -4,3 +4,7 @@
   <link rel="stylesheet" href="/assets/screen.css">
 </head>
 <body>
+  <h1>{{title}}</h1>
+{% if data.notice then %}
+  <div class="notice {{data.notice.level}}">{{data.notice.message}}</div>
+{% end %}

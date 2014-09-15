@@ -1,25 +1,37 @@
 -- task management example
 
+-- define routes
 INSERT INTO route (method, path, proc, description) VALUES
-('delete' , '/task/{id}'             , 'delete_task'      , 'delete a task'),
-('get'    , '/task'                  , 'create_task_form' , 'template route of task creation form'),
-('get'    , '/tasks'                 , 'get_tasks'        , 'all tasks'),
-('get'    , '/task/{id}'             , 'get_task'         , 'get task details'),
-('get'    , '/tasks?status={status}' , 'get_tasks'        , 'filter tasks'),
-('post'   , '/task/{id}/cancel'      , 'post_task_cancel' , 'cancel a task'),
-('post'   , '/task/{id}/finish'      , 'post_task_finish' , 'finish a task'),
-('post'   , '/task/{id}/reopen'      , 'post_task_reopen' , 'reopen a task'),
-('post'   , '/task'                  , 'post_task'        , 'create a task'),
-('put'    , '/task/{id}'             , 'put_task'         , 'update a task');
+('delete' , '/task/{id}'             , 'delete_task'           , 'delete a task'),
+('get'    , '/task'                  , 'form_post_task'        , 'template route of task creation form'),
+('get'    , '/tasks'                 , 'get_tasks'             , 'all tasks'),
+('get'    , '/tasks?status={status}' , 'get_tasks'             , 'filter tasks'),
+('get'    , '/task/{id}'             , 'get_task'              , 'get task details'),
+('get'    , '/task/{id}/cancel'      , 'form_post_task_cancel' , 'confirm task cancel'),
+('get'    , '/task/{id}/delete'      , 'form_delete_task'      , 'confirm task delete'),
+('get'    , '/task/{id}/finish'      , 'form_post_task_finish' , 'confirm task finish'),
+('get'    , '/task/{id}/reopen'      , 'form_post_task_reopen' , 'confirm task reopen'),
+('post'   , '/task'                  , 'post_task'             , 'create a task'),
+('post'   , '/task/{id}/cancel'      , 'post_task_cancel'      , 'cancel a task'),
+('post'   , '/task/{id}/finish'      , 'post_task_finish'      , 'finish a task'),
+('post'   , '/task/{id}/reopen'      , 'post_task_reopen'      , 'reopen a task'),
+('put'    , '/task/{id}'             , 'put_task'              , 'update a task');
 
+-- map templates
 INSERT INTO template (proc, mime, path, locals) VALUES
-('get_task'         , 'html' , 'tasks/details.html' , '{"title":"task details"}'::json),
-('get_tasks'        , 'html' , 'tasks/index.html'   , '{"title":"task list"}'::json),
-('get_tasks'        , 'svg'  , 'tasks/stats.svg'    , '{"title":"task stats"}'::json),
-('create_task_form' , 'html' , 'tasks/create.html'  , '{"title":"create a task"}'::json);
+('get_task'              , 'html' , 'tasks/details.html' , '{"title":"Task details"}'::json),
+('get_tasks'             , 'html' , 'tasks/index.html'   , '{"title":"Task list"}'::json),
+('get_tasks'             , 'svg'  , 'tasks/stats.svg'    , '{"title":"Task statistics"}'::json),
+('form_delete_task'      , 'html' , 'tasks/delete.html'  , '{"title":"Confirm task delete"}'::json),
+('form_post_task'        , 'html' , 'tasks/create.html'  , '{"title":"Create a task"}'::json),
+('form_post_task_cancel' , 'html' , 'tasks/cancel.html'  , '{"title":"Cancel task"}'::json),
+('form_post_task_finish' , 'html' , 'tasks/finish.html'  , '{"title":"Finish task"}'::json),
+('form_post_task_reopen' , 'html' , 'tasks/reopen.html'  , '{"title":"Reopen task"}'::json);
 
+-- status of a task
 CREATE TYPE status AS ENUM ('open', 'cancelled', 'done');
 
+-- task definition
 CREATE TABLE task (
   id          serial PRIMARY KEY,
   status      status NOT NULL DEFAULT 'open',
@@ -27,20 +39,111 @@ CREATE TABLE task (
   description text   NOT NULL DEFAULT ''
 );
 
+-- serialize task record with route actions
 CREATE FUNCTION json_build_task(t task)
-  RETURNS json AS $$ DECLARE ref text[] := ARRAY[t.id];
+  RETURNS json AS $$ DECLARE ref text[] := ARRAY[t.id]; routes text[];
   BEGIN
+    routes := ARRAY[
+      'get', route_action('get', 'get_task', ref)
+    , 'delete', route_action('delete', 'delete_task', ref)
+    , 'put', route_action('put', 'put_task', ref)
+    ];
+    IF t.status <> 'open' THEN
+      routes := array_cat(routes, ARRAY[
+        'reopen', route_action('post', 'post_task_reopen', ref)
+      ]);
+    ELSE
+      routes := array_cat(routes, ARRAY[
+        'cancel', route_action('post', 'post_task_cancel', ref)
+      , 'finish', route_action('post', 'post_task_finish', ref)
+      ]);
+    END IF;
     RETURN json_build_object(
       'id', t.id
     , 'status', t.status
     , 'subject' , t.subject
     , 'description' , t.description
-    , 'routes', json_build_object(
-        'delete', route_action('delete', 'delete_task', ref)
-      , 'get', route_action('get', 'get_task', ref)
-      , 'put', route_action('put', 'put_task', ref))
+    , 'routes', json_object(routes)
     );
   END;
+$$ LANGUAGE plpgsql;
+
+-- SQL task API
+
+CREATE FUNCTION cancel_task(t_id int)
+  RETURNS task AS $$ DECLARE t task;
+  BEGIN
+    UPDATE task SET status = 'cancelled'
+    WHERE id = t_id AND status = 'open'
+    RETURNING * INTO STRICT t;
+    RETURN t;
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION create_task(t_subject text, t_description text)
+  RETURNS task AS $$ DECLARE t task;
+  BEGIN
+    INSERT INTO task (subject, description) VALUES (t_subject, t_description) RETURNING * INTO t;
+    RETURN t;
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION delete_task(t_id int)
+  RETURNS task AS $$ DECLARE t task;
+  BEGIN
+    DELETE FROM task WHERE id = t_id RETURNING * INTO STRICT t;
+    RETURN t;
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION finish_task(t_id int)
+  RETURNS task AS $$ DECLARE t task;
+  BEGIN
+    UPDATE task SET status = 'done'
+    WHERE id = t_id AND status = 'open'
+    RETURNING * INTO STRICT t;
+    RETURN t;
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION reopen_task(t_id int)
+  RETURNS task AS $$ DECLARE t task;
+  BEGIN
+    UPDATE task SET status = 'open'
+    WHERE id = t_id
+    RETURNING * INTO STRICT t;
+    RETURN t;
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION update_task(t_id int, t_subject text, t_description text)
+  RETURNS task AS $$ DECLARE t task;
+  BEGIN
+    UPDATE task SET subject = t_subject, description = t_description
+    WHERE id = t_id RETURNING * INTO STRICT t;
+    RETURN t;
+  END;
+$$ LANGUAGE plpgsql;
+
+-- REST task API
+
+CREATE FUNCTION delete_task(req request)
+  RETURNS response AS $$ DECLARE t task;
+  BEGIN
+    t := delete_task((req.params->>'id')::int);
+    RETURN (204, json_build_object('routes', json_build_object('next', route_action('get', 'get_tasks'))));
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION get_task(req request)
+  RETURNS response AS $$ DECLARE t task;
+  BEGIN
+    SELECT * FROM task WHERE id = (req.params->>'id')::int INTO STRICT t;
+    RETURN (200, json_build_object(
+      'task', json_build_task(t)
+    , 'routes', json_build_object('list', route_action('get', 'get_tasks')))
+    );
+   END;
 $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION get_tasks(req request)
@@ -58,37 +161,6 @@ CREATE FUNCTION get_tasks(req request)
   END;
 $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION create_task_form(req request)
-  RETURNS response AS $$
-  BEGIN
-    RETURN (200, json_build_object(
-      'placeholder', json_build_object('subject', 'What?', 'description', 'Why How for Whom?')
-    , 'routes', json_build_object(
-        'list', route_action('get', 'get_tasks')
-      , 'post', route_action('post', 'post_task')))
-    );
-  END;
-$$ LANGUAGE plpgsql;
-
-CREATE FUNCTION create_task(t_subject text, t_description text)
-  RETURNS task AS $$ DECLARE t task;
-  BEGIN
-    INSERT INTO task (subject, description) VALUES (t_subject, t_description) RETURNING * INTO t;
-    RETURN t;
-  END;
-$$ LANGUAGE plpgsql;
-
-CREATE FUNCTION get_task(req request)
-  RETURNS response AS $$ DECLARE t task;
-  BEGIN
-    SELECT * FROM task WHERE id = (req.params->>'id')::int INTO STRICT t;
-    RETURN (200, json_build_object(
-      'task', json_build_task(t)
-    , 'routes', json_build_object('list', route_action('get', 'get_tasks')))
-    );
-   END;
-$$ LANGUAGE plpgsql;
-
 CREATE FUNCTION post_task(req request)
   RETURNS response AS $$ DECLARE t task; j json;
   BEGIN
@@ -101,19 +173,39 @@ CREATE FUNCTION post_task(req request)
   END;
 $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION update_task(t_id int, t_subject text, t_description text)
-  RETURNS task AS $$ DECLARE t task;
+CREATE FUNCTION post_task_cancel(req request)
+  RETURNS response AS $$ DECLARE t task;
   BEGIN
-    UPDATE task SET subject = t_subject, description = t_description
-    WHERE id = t_id RETURNING * INTO STRICT t;
-    RETURN t;
+    t := cancel_task((req.params->>'id')::int);
+    RETURN (200, json_build_task(t));
+  EXCEPTION
+    WHEN no_data_found THEN
+      RETURN (405, to_json((SQLSTATE, SQLERRM)::error));
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION post_task_finish(req request)
+  RETURNS response AS $$ DECLARE t task;
+  BEGIN
+    t := finish_task((req.params->>'id')::int);
+    RETURN (200, json_build_task(t));
+  EXCEPTION
+    WHEN no_data_found THEN
+      RETURN (405, to_json((SQLSTATE, SQLERRM)::error));
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION post_task_reopen(req request)
+  RETURNS response AS $$ DECLARE t task;
+  BEGIN
+    t := reopen_task((req.params->>'id')::int);
+    RETURN (200, json_build_task(t));
   END;
 $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION put_task(req request)
   RETURNS response AS $$ DECLARE t task;
   BEGIN
-    RAISE INFO 'UPDATE TASK %', req;
     t := update_task((req.params->>'id')::int, req.body->>'subject', req.body->>'description');
     RETURN (200, json_build_object(
       'task', json_build_task(t)
@@ -126,79 +218,45 @@ CREATE FUNCTION put_task(req request)
   END;
 $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION finish_task(t_id int)
-  RETURNS task AS $$ DECLARE t task;
+-- HTML form task API
+
+CREATE FUNCTION form_post_task(req request)
+  RETURNS response AS $$
   BEGIN
-    UPDATE task SET status = 'done'
-    WHERE id = t_id AND status = 'open'
-    RETURNING * INTO STRICT t;
-    RETURN t;
+    RETURN (200, json_build_object(
+      'placeholder', json_build_object('subject', 'What?', 'description', 'Why How for Whom?')
+    , 'routes', json_build_object(
+        'list', route_action('get', 'get_tasks')
+      , 'post', route_action('post', 'post_task')))
+    );
   END;
 $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION post_task_finish(req request)
-  RETURNS response AS $$ DECLARE t task;
+CREATE FUNCTION form_delete_task(req request)
+  RETURNS response AS $$
   BEGIN
-    t := finish_task((req.params->>'id')::int);
-    RETURN (200, to_json(t));
-  EXCEPTION
-    WHEN no_data_found THEN
-      RETURN (405, to_json((SQLSTATE, SQLERRM)::error));
+    RETURN get_task(req);
   END;
 $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION cancel_task(t_id int)
-  RETURNS task AS $$ DECLARE t task;
+CREATE FUNCTION form_post_task_cancel(req request)
+  RETURNS response AS $$
   BEGIN
-    UPDATE task SET status = 'cancelled'
-    WHERE id = t_id AND status = 'open'
-    RETURNING * INTO STRICT t;
-    RETURN t;
+    RETURN get_task(req);
   END;
 $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION post_task_cancel(req request)
-  RETURNS response AS $$ DECLARE t task;
+CREATE FUNCTION form_post_task_finish(req request)
+  RETURNS response AS $$
   BEGIN
-    t := cancel_task((req.params->>'id')::int);
-    RETURN (200, to_json(t));
-  EXCEPTION
-    WHEN no_data_found THEN
-      RETURN (405, to_json((SQLSTATE, SQLERRM)::error));
+    RETURN get_task(req);
   END;
 $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION reopen_task(t_id int)
-  RETURNS task AS $$ DECLARE t task;
+CREATE FUNCTION form_post_task_reopen(req request)
+  RETURNS response AS $$
   BEGIN
-    UPDATE task SET status = 'open'
-    WHERE id = t_id
-    RETURNING * INTO STRICT t;
-    RETURN t;
-  END;
-$$ LANGUAGE plpgsql;
-
-CREATE FUNCTION post_task_reopen(req request)
-  RETURNS response AS $$ DECLARE t task;
-  BEGIN
-    t := reopen_task((req.params->>'id')::int);
-    RETURN (200, to_json(t));
-  END;
-$$ LANGUAGE plpgsql;
-
-CREATE FUNCTION delete_task(t_id int)
-  RETURNS task AS $$ DECLARE t task;
-  BEGIN
-    DELETE FROM task WHERE id = t_id RETURNING * INTO STRICT t;
-    RETURN t;
-  END;
-$$ LANGUAGE plpgsql;
-
-CREATE FUNCTION delete_task(req request)
-  RETURNS response AS $$ DECLARE t task;
-  BEGIN
-    t := delete_task((req.params->>'id')::int);
-    RETURN (204, to_json(t));
+    RETURN get_task(req);
   END;
 $$ LANGUAGE plpgsql;
 

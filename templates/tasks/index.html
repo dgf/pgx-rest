@@ -1,12 +1,12 @@
 {(header.html)}
-  <h1>{{title}}</h1>
-  <a href="{*data.routes.post*}">create a task</a>
+  <a href="{*data.routes.post*}">Create new task</a>
   <table>
     <thead>
       <tr>
-        <th>status</th>
-        <th>subject</th>
-        <th>description</th>
+        <th>Status</th>
+        <th>Subject</th>
+        <th>Description</th>
+        <th>Actions</th>
       <tr>
     </thead>
     <tbody>
@@ -15,6 +15,17 @@
         <td>{{task.status}}</td>
         <td><a href="{{task.routes.get}}">{{task.subject}}</a></td>
         <td>{{task.description}}</td>
+        <td>
+          <ul class="actions">
+{% if task.status == "open" then %}
+            <li><a href="{*task.routes.get*}/finish">Finish</a></li>
+            <li><a href="{*task.routes.get*}/cancel">Cancel</a></li>
+{% else %}
+            <li><a href="{*task.routes.get*}/reopen">Reopen</a></li>
+{% end %}
+            <li><a href="{*task.routes.get*}/delete">Delete</a></li>
+          </ul>
+        </td>
       </tr>
 {% end %}
     </tbody>

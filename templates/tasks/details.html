@@ -1,16 +1,31 @@
 {(header.html)}
   <form action="{*data.task.routes.put*}" method="post">
     <input name="method" type="hidden" value="put">
-{% if data.notice then %}
-    <div class="notice {{data.notice.level}}">{{data.notice.message}}</div>
-{% end %}
     <div class="row">
-      <label>Subject</label>
-      <input required name="subject" value="{{data.task.subject}}">
+      <label>Subject
+        <input required name="subject" value="{{data.task.subject}}">
+      </label>
     </div>
     <div class="row">
-      <label>Description</label>
-      <textarea name="description">{{data.task.description}}</textarea>
+      <label>Status
+        <span>{{data.task.status}}</span>
+      </label>
+    </div>
+    <div class="row">
+      <ul class="actions">
+{% if data.task.status == "open" then %}
+        <li><a href="{*data.task.routes.get*}/finish">Finish</a></li>
+        <li><a href="{*data.task.routes.get*}/cancel">Cancel</a></li>
+{% else %}
+        <li><a href="{*data.task.routes.get*}/reopen">Reopen</a></li>
+{% end %}
+        <li><a href="{*data.task.routes.get*}/delete">Delete</a></li>
+      </ul>
+    </div>
+    <div class="row">
+      <label>Description
+        <textarea name="description">{{data.task.description}}</textarea>
+      </label>
     </div>
     <div class="row">
       <a href="{*data.routes.list*}">List all tasks</a>
