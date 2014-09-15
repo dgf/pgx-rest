@@ -1,7 +1,6 @@
 -- cleanup in reverse order, this also documents the API top down
 
--- application endpoints
-DROP FUNCTION IF EXISTS create_task_form(request);
+-- application REST endpoints
 DROP FUNCTION IF EXISTS delete_contact(request);
 DROP FUNCTION IF EXISTS delete_task(request);
 DROP FUNCTION IF EXISTS get_contact(request);
@@ -18,10 +17,38 @@ DROP FUNCTION IF EXISTS put_contact_address(request);
 DROP FUNCTION IF EXISTS put_contact(request);
 DROP FUNCTION IF EXISTS put_task(request);
 
--- routing endpoints
+-- JSON serialization
+DROP FUNCTION IF EXISTS json_build_task(task);
+
+-- addition HTML form endpoint
+DROP FUNCTION IF EXISTS form_delete_task(request);
+DROP FUNCTION IF EXISTS form_post_task(request);
+DROP FUNCTION IF EXISTS form_post_task_cancel(request);
+DROP FUNCTION IF EXISTS form_post_task_finish(request);
+DROP FUNCTION IF EXISTS form_post_task_reopen(request);
+
+-- business logic
+DROP FUNCTION IF EXISTS cancel_task(int);
+DROP FUNCTION IF EXISTS create_contact(text, text, text, text);
+DROP FUNCTION IF EXISTS create_task(text, text);
+DROP FUNCTION IF EXISTS delete_contact(int);
+DROP FUNCTION IF EXISTS delete_task(int);
+DROP FUNCTION IF EXISTS finish_task(int);
+DROP FUNCTION IF EXISTS reopen_task(int);
+DROP FUNCTION IF EXISTS update_contact_address(int, text, text, text);
+DROP FUNCTION IF EXISTS update_contact(int, text, text);
+DROP FUNCTION IF EXISTS update_task(int, text, text);
+DROP TABLE    IF EXISTS task;
+DROP TABLE    IF EXISTS contact;
+DROP TABLE    IF EXISTS address;
+DROP TYPE     IF EXISTS status;
+
+-- routing API endpoints
 DROP FUNCTION IF EXISTS call(method, text, json);
 DROP FUNCTION IF EXISTS delete(text);
 DROP FUNCTION IF EXISTS get(text);
+DROP FUNCTION IF EXISTS get_routes(request);
+DROP FUNCTION IF EXISTS get_templates(request);
 DROP FUNCTION IF EXISTS post(text);
 DROP FUNCTION IF EXISTS post(text, json);
 DROP FUNCTION IF EXISTS put(text, json);
@@ -36,21 +63,4 @@ DROP TYPE     IF EXISTS error;
 DROP TYPE     IF EXISTS method;
 DROP TYPE     IF EXISTS response;
 DROP TYPE     IF EXISTS request;
-
--- business logic
-DROP FUNCTION IF EXISTS cancel_task(int);
-DROP FUNCTION IF EXISTS create_contact(text, text, text, text);
-DROP FUNCTION IF EXISTS create_task(text, text);
-DROP FUNCTION IF EXISTS delete_contact(int);
-DROP FUNCTION IF EXISTS delete_task(int);
-DROP FUNCTION IF EXISTS finish_task(int);
-DROP FUNCTION IF EXISTS json_build_task(task);
-DROP FUNCTION IF EXISTS reopen_task(int);
-DROP FUNCTION IF EXISTS update_contact_address(int, text, text, text);
-DROP FUNCTION IF EXISTS update_contact(int, text, text);
-DROP FUNCTION IF EXISTS update_task(int, text, text);
-DROP TABLE    IF EXISTS task;
-DROP TABLE    IF EXISTS contact;
-DROP TABLE    IF EXISTS address;
-DROP TYPE     IF EXISTS status;
 
