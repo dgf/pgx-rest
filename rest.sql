@@ -32,6 +32,15 @@ CREATE TABLE route (
   match       text   NOT NULL  -- prepared regexp match
 );
 
+-- template mapping
+CREATE TABLE template (
+  id     serial PRIMARY KEY,
+  proc   text   NOT NULL, -- SQL function
+  mime   text   NOT NULL, -- mime type
+  path   text   NOT NULL, -- template file path
+  locals json   NOT NULL  -- default template values like the title of a HTML template
+);
+
 -- prepare route path matches
 CREATE FUNCTION route_path_match()
   RETURNS trigger AS $$ DECLARE path text; params text[];
@@ -49,55 +58,6 @@ CREATE FUNCTION route_path_match()
   END;
 $$ LANGUAGE plpgsql;
 CREATE TRIGGER route_path_match BEFORE INSERT OR UPDATE ON route FOR EACH ROW EXECUTE PROCEDURE route_path_match();
-
--- create a route action URI with params
-CREATE FUNCTION route_action(m method, a_proc text, a_params text[])
-  RETURNS text AS $$ DECLARE r route; path text; param text; i int;
-  BEGIN
-    SELECT * FROM route
-    WHERE m = method
-      AND a_proc = proc
-      AND array_length(a_params, 1) = array_length(params, 1)
-    INTO STRICT r;
-    path := r.path;
-    FOR i IN array_lower(a_params, 1) .. array_upper(a_params, 1)
-    LOOP -- replace all params by key
-      path := regexp_replace(path, '({'||r.params[i]||'})', a_params[i]);
-    END LOOP;
-    RETURN path;
-  END;
-$$ LANGUAGE plpgsql;
-
--- create a route action URI without params
-CREATE FUNCTION route_action(m method, a_proc text)
-  RETURNS text AS $$ DECLARE r route; path text;
-  BEGIN
-    SELECT * FROM route
-    WHERE m = method
-      AND a_proc = proc
-      AND array_length(params, 1) IS NULL
-    INTO STRICT r;
-    RETURN r.path;
-  END;
-$$ LANGUAGE plpgsql;
-
--- list all routes
-INSERT INTO route (method, path, proc, description) VALUES
-('get', '/routes', 'get_routes', 'list all published routes');
-CREATE FUNCTION get_routes(req request)
-  RETURNS response AS $$ DECLARE routes json;
-  BEGIN
-    SELECT json_agg(json_build_object(
-      'path', r.path
-    , 'method', r.method
-    , 'proc', r.proc
-    , 'params', r.params
-    , 'description', r.description)
-    ORDER BY r.path, r.method)
-    FROM route r INTO routes;
-    RETURN (200, json_build_object('routes', routes));
-  END;
-$$ LANGUAGE plpgsql;
 
 -- route an endpoint call
 CREATE FUNCTION call(m method, c_path text, body json)
@@ -118,6 +78,20 @@ CREATE FUNCTION call(m method, c_path text, body json)
   END;
 $$ LANGUAGE plpgsql
    -- This grants the access to all published routes!
+   SECURITY DEFINER;
+
+-- template path lookup
+CREATE FUNCTION find_template(r_mime text, r_path text, OUT path text, OUT locals json)
+  AS $$ DECLARE r route; t template;
+  BEGIN
+    SELECT * FROM route WHERE 'get' = method AND r_path ~ match INTO STRICT r;
+    SELECT * FROM template WHERE r_mime = mime AND r.proc = proc INTO STRICT t;
+    path := t.path;
+    locals := t.locals;
+  EXCEPTION WHEN no_data_found THEN path := NULL;
+  END;
+$$ LANGUAGE plpgsql
+   -- Export access for all!
    SECURITY DEFINER;
 
 -- call a GET route
@@ -157,6 +131,89 @@ CREATE FUNCTION delete(path text)
   RETURNS response AS $$
   BEGIN
     RETURN call('delete'::method, path, '{}'::json);
+  END;
+$$ LANGUAGE plpgsql;
+
+-- create a route action URI with params
+CREATE FUNCTION route_action(m method, a_proc text, a_params text[])
+  RETURNS text AS $$ DECLARE r route; path text; param text; i int;
+  BEGIN
+    SELECT * FROM route
+    WHERE m = method
+      AND a_proc = proc
+      AND array_length(a_params, 1) = array_length(params, 1)
+    INTO STRICT r;
+    path := r.path;
+    FOR i IN array_lower(a_params, 1) .. array_upper(a_params, 1)
+    LOOP -- replace all params by key
+      path := regexp_replace(path, '({'||r.params[i]||'})', a_params[i]);
+    END LOOP;
+    RETURN path;
+  END;
+$$ LANGUAGE plpgsql;
+
+-- create a route action URI without params
+CREATE FUNCTION route_action(m method, a_proc text)
+  RETURNS text AS $$ DECLARE r route; path text;
+  BEGIN
+    SELECT * FROM route
+    WHERE m = method
+      AND a_proc = proc
+      AND array_length(params, 1) IS NULL
+    INTO STRICT r;
+    RETURN r.path;
+  END;
+$$ LANGUAGE plpgsql;
+
+-- API routes
+INSERT INTO route (method, path, proc, description) VALUES
+('get', '/routes', 'get_routes', 'list all published routes'),
+('get', '/templates', 'get_templates', 'list all published templates');
+
+-- API templates
+INSERT INTO template (proc, mime, path, locals) VALUES
+('get_routes'   , 'html', 'rest/routes.html', '{"title":"Public routes API"}'::json),
+('get_templates', 'html', 'rest/templates.html', '{"title":"Published templates"}'::json);
+
+-- list all routes
+CREATE FUNCTION get_routes(req request)
+  RETURNS response AS $$ DECLARE routes json;
+  BEGIN
+    SELECT json_agg(json_build_object(
+      'path', r.path
+    , 'method', r.method
+    , 'proc', r.proc
+    , 'params', r.params
+    , 'description', r.description)
+    ORDER BY r.path, r.method)
+    FROM route r INTO routes;
+    RETURN (200, json_build_object('routes', routes));
+  END;
+$$ LANGUAGE plpgsql;
+
+-- list all templates
+CREATE FUNCTION get_templates(req request)
+  RETURNS response AS $$ DECLARE templates json;
+  BEGIN
+    WITH template_list AS (
+      SELECT t.*, json_agg(json_build_object(
+        'method', r.method
+      , 'params', r.params
+      , 'path', r.path)
+      ORDER BY r.method, r.path) AS routes
+      FROM template t
+      JOIN route r ON r.proc = t.proc
+      GROUP BY t.id
+    )
+    SELECT json_agg(json_build_object(
+      'path', path
+    , 'proc', proc
+    , 'mime', mime
+    , 'locals', locals
+    , 'routes', routes)
+    ORDER BY t.path, t.mime)
+    FROM template_list t INTO templates;
+    RETURN (200, json_build_object('templates', templates));
   END;
 $$ LANGUAGE plpgsql;
 
