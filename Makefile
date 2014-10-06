@@ -3,6 +3,9 @@ db_name=rest_check
 init:
 	createdb $(db_name)
 
+setup:
+	psql $(db_name) -f setup.sql
+
 cli:
 	psql $(db_name)
 

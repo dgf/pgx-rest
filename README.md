@@ -19,9 +19,10 @@ and use a tagged repository to overrule the libpg version.
 
 Define a database name in the Makefile or use `rest_check` (the default).
 
-create a fresh database
+create a fresh database and load required contrib modules
 ```sh
 $ make init
+$ make setup
 ```
 
 import all examples
