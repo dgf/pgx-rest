@@ -6,7 +6,18 @@
   <link rel="stylesheet" href="/assets/screen.css">
 </head>
 <body>
+  <div class="profile">
+{% if session and session.user then %}
+    <form action="/logout" method="post">
+      Hello <span class="user">{{session.user}}</span>
+      <button type="submit">Logout</button>
+    </form>
+{% else %}
+    <a href="/login">Login</a>
+{% end %}
+  </div>
   <h1>{{title}}</h1>
-{% if data.notice then %}
+{% if data and data.notice then %}
   <div class="notice {{data.notice.level}}">{{data.notice.message}}</div>
 {% end %}
+

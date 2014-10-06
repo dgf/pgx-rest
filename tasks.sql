@@ -1,32 +1,32 @@
 -- task management example
 
 -- define routes
-INSERT INTO route (method, path, proc, description) VALUES
-('delete' , '/task/{id}'             , 'delete_task'           , 'delete a task'),
-('get'    , '/task'                  , 'form_post_task'        , 'template route of task creation form'),
-('get'    , '/tasks'                 , 'get_tasks'             , 'all tasks'),
-('get'    , '/tasks?status={status}' , 'get_tasks'             , 'filter tasks'),
-('get'    , '/task/{id}'             , 'get_task'              , 'get task details'),
-('get'    , '/task/{id}/cancel'      , 'form_post_task_cancel' , 'confirm task cancel'),
-('get'    , '/task/{id}/delete'      , 'form_delete_task'      , 'confirm task delete'),
-('get'    , '/task/{id}/finish'      , 'form_post_task_finish' , 'confirm task finish'),
-('get'    , '/task/{id}/reopen'      , 'form_post_task_reopen' , 'confirm task reopen'),
-('post'   , '/task'                  , 'post_task'             , 'create a task'),
-('post'   , '/task/{id}/cancel'      , 'post_task_cancel'      , 'cancel a task'),
-('post'   , '/task/{id}/finish'      , 'post_task_finish'      , 'finish a task'),
-('post'   , '/task/{id}/reopen'      , 'post_task_reopen'      , 'reopen a task'),
-('put'    , '/task/{id}'             , 'put_task'              , 'update a task');
+INSERT INTO route (method, path, proc, legitimate, description) VALUES
+('get'   , '/task'                 , 'form_post_task'       , '{"every"}', 'template route of task creation form'),
+('get'   , '/tasks'                , 'get_tasks'            , '{"every"}', 'all tasks'),
+('get'   , '/tasks?status={status}', 'get_tasks'            , '{"every"}', 'filter tasks'),
+('get'   , '/task/{id}'            , 'get_task'             , '{"every"}', 'get task details'),
+('post'  , '/task'                 , 'post_task'            , '{"every"}', 'create a task'),
+('delete', '/task/{id}'            , 'delete_task'          , '{"user"}' , 'delete a task'),
+('get'   , '/task/{id}/cancel'     , 'form_post_task_cancel', '{"user"}' , 'confirm task cancel'),
+('get'   , '/task/{id}/delete'     , 'form_delete_task'     , '{"user"}', 'confirm task delete'),
+('get'   , '/task/{id}/finish'     , 'form_post_task_finish', '{"user"}' , 'confirm task finish'),
+('get'   , '/task/{id}/reopen'     , 'form_post_task_reopen', '{"user"}' , 'confirm task reopen'),
+('post'  , '/task/{id}/cancel'     , 'post_task_cancel'     , '{"user"}' , 'cancel a task'),
+('post'  , '/task/{id}/finish'     , 'post_task_finish'     , '{"user"}' , 'finish a task'),
+('post'  , '/task/{id}/reopen'     , 'post_task_reopen'     , '{"user"}' , 'reopen a task'),
+('put'   , '/task/{id}'            , 'put_task'             , '{"user"}' , 'update a task');
 
 -- map templates
 INSERT INTO template (proc, mime, path, locals) VALUES
-('get_task'              , 'html' , 'tasks/details.html' , '{"title":"Task details"}'::json),
-('get_tasks'             , 'html' , 'tasks/index.html'   , '{"title":"Task list"}'::json),
-('get_tasks'             , 'svg'  , 'tasks/stats.svg'    , '{"title":"Task statistics"}'::json),
-('form_delete_task'      , 'html' , 'tasks/delete.html'  , '{"title":"Confirm task delete"}'::json),
-('form_post_task'        , 'html' , 'tasks/create.html'  , '{"title":"Create a task"}'::json),
-('form_post_task_cancel' , 'html' , 'tasks/cancel.html'  , '{"title":"Cancel task"}'::json),
-('form_post_task_finish' , 'html' , 'tasks/finish.html'  , '{"title":"Finish task"}'::json),
-('form_post_task_reopen' , 'html' , 'tasks/reopen.html'  , '{"title":"Reopen task"}'::json);
+('get_task'             , 'html', 'tasks/details.html', '{"title":"Task details"}'::json),
+('get_tasks'            , 'html', 'tasks/index.html'  , '{"title":"Task list"}'::json),
+('get_tasks'            , 'svg' , 'tasks/stats.svg'   , '{"title":"Task statistics"}'::json),
+('form_delete_task'     , 'html', 'tasks/delete.html' , '{"title":"Confirm task delete"}'::json),
+('form_post_task'       , 'html', 'tasks/create.html' , '{"title":"Create a task"}'::json),
+('form_post_task_cancel', 'html', 'tasks/cancel.html' , '{"title":"Cancel task"}'::json),
+('form_post_task_finish', 'html', 'tasks/finish.html' , '{"title":"Finish task"}'::json),
+('form_post_task_reopen', 'html', 'tasks/reopen.html' , '{"title":"Reopen task"}'::json);
 
 -- status of a task
 CREATE TYPE status AS ENUM ('open', 'cancelled', 'done');

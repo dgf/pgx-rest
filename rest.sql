@@ -9,27 +9,59 @@ CREATE TYPE error AS (
   message     text  -- SQL error message
 );
 
--- HTTP request
+-- REST request
 CREATE TYPE request AS (
-  params      json, -- HTTP route params
-  body        json  -- JSON payload
+  body        json, -- JSON payload
+  session     json, -- HTTP session with user, roles and expiration
+  params      json  -- HTTP route params
+);
+
+-- REST response
+CREATE TYPE response AS (
+  code        int, -- HTTP status code like 201, 404, 500
+  data        json -- JSON result object or error message
 );
 
 -- HTTP response
-CREATE TYPE response AS (
+CREATE TYPE http_response AS (
   code        int,  -- HTTP status code like 201, 404, 500
+  session     json, -- HTTP session with user, roles and expiration
   data        json  -- JSON result object or error message
+);
+
+-- application role
+CREATE TYPE arole AS ENUM ('admin', 'every', 'user');
+
+-- application user
+CREATE TABLE auser (
+  id          serial  PRIMARY KEY,
+  login       text    NOT NULL,
+  http_basic  text    NOT NULL,
+  roles       arole[] NOT NULL,
+  description text    NOT NULL,
+  UNIQUE (login)
+);
+
+-- application session
+CREATE TABLE asession (
+  id      serial    PRIMARY KEY,
+  user_id int       NOT NULL REFERENCES auser,
+  session uuid      NOT NULL DEFAULT uuid_generate_v4(),
+  expires timestamp NOT NULL DEFAULT now() + INTERVAL '37 minute',
+  UNIQUE (session)
 );
 
 -- HTTP route
 CREATE TABLE route (
   id          serial PRIMARY KEY,
-  method      method NOT NULL DEFAULT 'get',
-  path        text   NOT NULL, -- request path with params
-  proc        text   NOT NULL, -- function to call
-  description text   NOT NULL,
-  params      text[] NOT NULL, -- param array (extracted from path)
-  match       text   NOT NULL  -- prepared regexp match
+  method      method  NOT NULL DEFAULT 'get',
+  path        text    NOT NULL, -- request path with params
+  proc        text    NOT NULL, -- function to call
+  legitimate  arole[] NOT NULL DEFAULT '{"every"}', -- restrict access
+  description text    NOT NULL,
+  params      text[]  NOT NULL, -- param array (extracted from path)
+  match       text    NOT NULL, -- prepared regexp match
+  UNIQUE (method, path)
 );
 
 -- template mapping
@@ -38,8 +70,32 @@ CREATE TABLE template (
   proc   text   NOT NULL, -- SQL function
   mime   text   NOT NULL, -- mime type
   path   text   NOT NULL, -- template file path
-  locals json   NOT NULL  -- default template values like the title of a HTML template
+  locals json   NOT NULL, -- default template values like the title of a HTML template
+  UNIQUE (mime, path)
 );
+
+-- create an user with roles and HTTP Basic Auth encoded password
+CREATE FUNCTION add_user(u_login text, u_password text, u_desc text, u_roles arole[])
+  RETURNS auser AS $$ DECLARE u auser;
+  BEGIN
+    INSERT INTO auser (login, http_basic, description, roles)
+    VALUES (u_login, encode(concat_ws(':', u_login, u_password)::bytea, 'base64'), u_desc, u_roles) RETURNING * INTO u;
+    RETURN u;
+  END;
+$$ LANGUAGE plpgsql;
+
+-- serialize session and user data
+CREATE FUNCTION json_build_session(s asession, u auser)
+  RETURNS json AS $$
+  BEGIN
+    RETURN json_build_object(
+      'id', s.session
+    , 'expires', s.expires
+    , 'epoch', EXTRACT(EPOCH FROM s.expires)::int
+    , 'user', u.login
+    , 'roles', u.roles);
+  END;
+$$ LANGUAGE plpgsql;
 
 -- prepare route path matches
 CREATE FUNCTION route_path_match()
@@ -60,21 +116,57 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER route_path_match BEFORE INSERT OR UPDATE ON route FOR EACH ROW EXECUTE PROCEDURE route_path_match();
 
 -- route an endpoint call
-CREATE FUNCTION call(m method, c_path text, body json)
-  RETURNS response AS $$ DECLARE r route; res response; req request; pns text[]; pvs text[];
+CREATE FUNCTION call(m method, c_path text, c_session uuid, body json)
+  RETURNS http_response AS $$
+  DECLARE
+    authorized boolean := false;
+    r route; s asession; u auser;
+    res response; req request;
+    pns text[]; pvs text[]; rs json;
   BEGIN
-    SELECT * FROM route WHERE m = method AND c_path ~ match INTO STRICT r;
-    IF array_length(r.params, 1) IS NULL THEN
-      req := ('{}'::json, body);
-    ELSE
-      SELECT regexp_matches(c_path, r.match) INTO pvs;
-      req := (json_object(r.params, pvs), body);
+    -- update session and fetch user
+    IF c_session IS NOT NULL THEN
+      UPDATE asession SET expires = now() + INTERVAL '37 minute'
+      WHERE session = c_session AND expires > now() RETURNING * INTO s;
+      SELECT * FROM auser WHERE id = s.user_id INTO u;
     END IF;
-    EXECUTE 'SELECT * FROM '||quote_ident(r.proc)||'($1)' USING req INTO STRICT res;
-    RETURN res;
+
+    -- map session and user
+    IF s IS NOT NULL THEN
+      rs = json_build_session(s, u);
+    END IF;
+
+    -- fetch route
+    SELECT * FROM route WHERE m = method AND c_path ~ match INTO STRICT r;
+    IF r.legitimate @> '{"every"}' THEN
+      authorized := true;
+    ELSE -- authorize
+      IF s IS NULL THEN -- not authenticated
+        RETURN (401, rs, to_json(('unauthenticated', 'authentication required')::error));
+      ELSE
+        IF r.legitimate && u.roles THEN -- authorized
+          authorized := true;
+        END IF;
+      END IF;
+    END IF;
+
+    IF NOT authorized THEN
+      RETURN (403, rs, to_json(('forbidden', 'authorization required')::error));
+    ELSE
+      -- map param names and values
+      IF array_length(r.params, 1) IS NULL THEN
+        req := (body, rs, '{}'::json); -- empty params
+      ELSE
+        SELECT regexp_matches(c_path, r.match) INTO pvs;
+        req := (body, rs, json_object(r.params, pvs));
+      END IF;
+      -- execute authorized function call
+      EXECUTE 'SELECT * FROM '||quote_ident(r.proc)||'($1)' USING req INTO STRICT res;
+      RETURN (res.code, rs, res.data);
+    END IF;
   EXCEPTION
-    WHEN no_data_found THEN RETURN (404, to_json((SQLSTATE, SQLERRM)::error));
-    WHEN OTHERS THEN RETURN (500, to_json((SQLSTATE, SQLERRM)::error));
+    WHEN no_data_found THEN RETURN (404, rs, to_json((SQLSTATE, SQLERRM)::error));
+    WHEN OTHERS THEN RETURN (500, rs, to_json((SQLSTATE, SQLERRM)::error));
   END;
 $$ LANGUAGE plpgsql
    -- This grants the access to all published routes!
@@ -95,42 +187,77 @@ $$ LANGUAGE plpgsql
    SECURITY DEFINER;
 
 -- call a GET route
-CREATE FUNCTION get(path text)
-  RETURNS response AS $$
+CREATE FUNCTION get(path text, session uuid)
+  RETURNS http_response AS $$
   BEGIN
-    RETURN call('get'::method, path, '{}'::json);
+    RETURN call('get'::method, path, session, '{}'::json);
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION get(path text)
+  RETURNS http_response AS $$
+  BEGIN
+    RETURN call('get'::method, path, NULL, '{}'::json);
   END;
 $$ LANGUAGE plpgsql;
 
 -- call a POST route
-CREATE FUNCTION post(path text, body json)
-  RETURNS response AS $$
+CREATE FUNCTION post(path text, session uuid, body json)
+  RETURNS http_response AS $$
   BEGIN
-    RETURN call('post'::method, path, body);
+    RETURN call('post'::method, path, session, body);
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION post(path text, body json)
+  RETURNS http_response AS $$
+  BEGIN
+    RETURN call('post'::method, path, NULL, body);
   END;
 $$ LANGUAGE plpgsql;
 
 -- call a POST route without body
-CREATE FUNCTION post(path text)
-  RETURNS response AS $$
+CREATE FUNCTION post(path text, session uuid)
+  RETURNS http_response AS $$
   BEGIN
-    RETURN call('post'::method, path, '{}'::json);
+    RETURN call('post'::method, path, session, '{}'::json);
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION post(path text)
+  RETURNS http_response AS $$
+  BEGIN
+    RETURN call('post'::method, path, NULL, '{}'::json);
   END;
 $$ LANGUAGE plpgsql;
 
 -- call a PUT route
-CREATE FUNCTION put(path text, body json)
-  RETURNS response AS $$
+CREATE FUNCTION put(path text, session uuid, body json)
+  RETURNS http_response AS $$
   BEGIN
-    RETURN call('put'::method, path, body);
+    RETURN call('put'::method, path, session, body);
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION put(path text, body json)
+  RETURNS http_response AS $$
+  BEGIN
+    RETURN call('put'::method, path, NULL, body);
   END;
 $$ LANGUAGE plpgsql;
 
 -- call a DELETE route
-CREATE FUNCTION delete(path text)
-  RETURNS response AS $$
+CREATE FUNCTION delete(path text, session uuid)
+  RETURNS http_response AS $$
   BEGIN
-    RETURN call('delete'::method, path, '{}'::json);
+    RETURN call('delete'::method, path, session, '{}'::json);
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION delete(path text)
+  RETURNS http_response AS $$
+  BEGIN
+    RETURN call('delete'::method, path, NULL, '{}'::json);
   END;
 $$ LANGUAGE plpgsql;
 
@@ -166,14 +293,78 @@ CREATE FUNCTION route_action(m method, a_proc text)
 $$ LANGUAGE plpgsql;
 
 -- API routes
-INSERT INTO route (method, path, proc, description) VALUES
-('get', '/routes', 'get_routes', 'list all published routes'),
-('get', '/templates', 'get_templates', 'list all published templates');
+INSERT INTO route (method, path, proc, legitimate, description) VALUES
+('get' , '/login'    , 'form_login'   , '{"every"}', 'login form'),
+('get' , '/routes'   , 'get_routes'   , '{"admin"}', 'list all published routes'),
+('get' , '/templates', 'get_templates', '{"admin"}', 'list all published templates');
 
 -- API templates
 INSERT INTO template (proc, mime, path, locals) VALUES
-('get_routes'   , 'html', 'rest/routes.html', '{"title":"Public routes API"}'::json),
+('form_login'   , 'html', 'login.html'         , '{"title":"Login"}'::json),
+('get_routes'   , 'html', 'rest/routes.html'   , '{"title":"Public routes API"}'::json),
 ('get_templates', 'html', 'rest/templates.html', '{"title":"Published templates"}'::json);
+
+-- HTTP Basic authentication request
+CREATE FUNCTION login(u_login text, u_basic_auth text)
+  RETURNS http_response AS $$ DECLARE s asession; u auser;
+  BEGIN
+    SELECT * FROM auser WHERE login = u_login AND http_basic = u_basic_auth INTO STRICT u;
+    INSERT INTO asession (user_id) VALUES (u.id) RETURNING * INTO STRICT s;
+    RETURN (200, json_build_session(s, u), json_build_object('notice', json_build_object('level', 'info', 'message', 'logged in')));
+  EXCEPTION
+    WHEN no_data_found THEN
+      RAISE NOTICE 'login failed %', to_json((SQLSTATE, SQLERRM)::error);
+      RETURN (400, 'null'::json, to_json((400, 'login failed')::error));
+  END;
+$$ LANGUAGE plpgsql
+   -- Everybody can try to login!
+   SECURITY DEFINER;
+
+-- HTML form login post request
+CREATE FUNCTION post_login(u_login text, u_password text)
+  RETURNS http_response AS $$ DECLARE res http_response;
+  BEGIN
+    SELECT * FROM login(u_login, encode(concat_ws(':', u_login, u_password)::bytea, 'base64')) INTO res;
+    RETURN res;
+  END;
+$$ LANGUAGE plpgsql
+   -- Everybody can try to login!
+   SECURITY DEFINER;
+
+-- HTML login form
+CREATE FUNCTION form_login(req request)
+  RETURNS response AS $$
+  BEGIN
+    RETURN (200, json_build_object('placeholder', json_build_object('login', 'user name', 'password', 'your complex passphrase')));
+  END;
+$$ LANGUAGE plpgsql;
+
+-- auth logout request
+CREATE FUNCTION logout(c_session uuid)
+  RETURNS asession AS $$ DECLARE s asession;
+  BEGIN
+    DELETE FROM asession WHERE session = c_session RETURNING * INTO STRICT s;
+    RETURN s;
+  END;
+$$ LANGUAGE plpgsql;
+
+-- HTTP auth logout request
+CREATE FUNCTION post_logout(c_session uuid)
+  RETURNS response AS $$
+  BEGIN
+    PERFORM logout(c_session);
+    RETURN (200, json_build_object(
+      'notice', json_build_object('level', 'info', 'message', 'logged out')
+    , 'routes', json_build_object('login', route_action('get', 'form_login')))
+    );
+  EXCEPTION
+    WHEN no_data_found THEN
+      RAISE NOTICE 'logout failed %', to_json((SQLSTATE, SQLERRM)::error);
+      RETURN (400, to_json((400, 'logout failed')::error));
+  END;
+$$ LANGUAGE plpgsql
+   -- Everybody can try a logout!
+   SECURITY DEFINER;
 
 -- list all routes
 CREATE FUNCTION get_routes(req request)

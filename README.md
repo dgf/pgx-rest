@@ -41,46 +41,55 @@ make cli
 
 list all existing routes
 ```SQL
-SELECT method, path, proc, description FROM route ORDER by path, method;
- method |          path          |        proc         |             description
---------+------------------------+---------------------+--------------------------------------
- get    | /                      | get_dashboard       | index page
- post   | /contact               | post_contact        | create a contact
- get    | /contact/{id}          | get_contact         | contact details
- put    | /contact/{id}          | put_contact         | update contact details
- delete | /contact/{id}          | delete_contact      | delete a contact
- put    | /contact/{id}/address  | put_contact_address | update contact address
- get    | /contacts              | get_contacts        | contact list
- get    | /task                  | create_task_form    | template route of task creation form
- post   | /task                  | post_task           | create a task
- get    | /task/{id}             | get_task            | get task details
- put    | /task/{id}             | put_task            | update a task
- delete | /task/{id}             | delete_task         | delete a task
- post   | /task/{id}/cancel      | post_task_cancel    | cancel a task
- post   | /task/{id}/finish      | post_task_finish    | finish a task
- post   | /task/{id}/reopen      | post_task_reopen    | reopen a task
- get    | /tasks                 | get_tasks           | all tasks
- get    | /tasks?status={status} | get_tasks           | filter tasks
-(17 rows)
+SELECT method, path, proc, legitimate, description FROM route ORDER by path, method;
+ method |          path          |         proc          | legitimate |             description              
+--------+------------------------+-----------------------+------------+--------------------------------------
+ get    | /                      | get_dashboard         | {every}    | index page
+ post   | /contact               | post_contact          | {every}    | create a contact
+ get    | /contact/{id}          | get_contact           | {every}    | contact details
+ put    | /contact/{id}          | put_contact           | {every}    | update contact details
+ delete | /contact/{id}          | delete_contact        | {every}    | delete a contact
+ put    | /contact/{id}/address  | put_contact_address   | {every}    | update contact address
+ get    | /contacts              | get_contacts          | {every}    | contact list
+ get    | /login                 | form_login            | {every}    | login form
+ get    | /routes                | get_routes            | {admin}    | list all published routes
+ get    | /task                  | form_post_task        | {every}    | template route of task creation form
+ post   | /task                  | post_task             | {every}    | create a task
+ get    | /task/{id}             | get_task              | {every}    | get task details
+ put    | /task/{id}             | put_task              | {user}     | update a task
+ delete | /task/{id}             | delete_task           | {user}     | delete a task
+ get    | /task/{id}/cancel      | form_post_task_cancel | {user}     | confirm task cancel
+ post   | /task/{id}/cancel      | post_task_cancel      | {user}     | cancel a task
+ get    | /task/{id}/delete      | form_delete_task      | {user}     | confirm task delete
+ get    | /task/{id}/finish      | form_post_task_finish | {user}     | confirm task finish
+ post   | /task/{id}/finish      | post_task_finish      | {user}     | finish a task
+ get    | /task/{id}/reopen      | form_post_task_reopen | {user}     | confirm task reopen
+ post   | /task/{id}/reopen      | post_task_reopen      | {user}     | reopen a task
+ get    | /tasks                 | get_tasks             | {every}    | all tasks
+ get    | /tasks?status={status} | get_tasks             | {every}    | filter tasks
+ get    | /templates             | get_templates         | {admin}    | list all published templates
+(24 rows)
 ```
 
 create a new task
 ```SQL
-SELECT post('/task', '{"subject": "todo", "description": "something"}'::json);
-                                           post                                            
--------------------------------------------------------------------------------------------
- (201,"{""id"":1,""status"":""open"",""subject"":""todo"",""description"":""something""}")
+SELECT data FROM post('/task', '{"subject": "todo", "description": "something"}'::json);
+{"id" : 6, "status" : "open", "subject" : "todo", "description" : "something", "routes" : {"get" : "/task/6", "delete" : "/task/6", "put" : "/task/6", "cancel" : "/task/6/cancel", "finish" : "/task/6/finish"}}
 (1 row)
 ```
 
-get all open tasks
-```SQL
-SELECT data FROM get('/tasks?status=open');
-                                 data                                  
------------------------------------------------------------------------
- [{"id":1,"status":"open","subject":"todo","description":"something ...
-(1 row)
-```
+## Public API routes
+
+ * generic route execution: `call(method, text, uuid, json)`
+   example GET request: `SELECT * FROM call('get', '/tasks', NULL, NULL);`
+ * template resolver: ```find_template(text, text)```
+   example call: ```SELECT * FROM find_template('html', '/tasks');```
+ * HTTP basic login: `login(text, text)`
+   example query: ```SELECT * FROM login('icke', encode(concat_ws(':', u_login, u_password)::bytea, 'base64'));```
+ * HTML form POST login: ```post_login(text, text)```
+   example query: ```SELECT * FROM post_login('icke', 'secret');```
+ * HTTP logout POST route: ```post_logout(uuid)```
+   example query: ```SELECT * FROM post_logout(uuid_generate_v4());```
 
 ## Development
 
@@ -107,8 +116,8 @@ $$ LANGUAGE plpgsql;
 
 route the endpoint
 ```SQL
-INSERT INTO route (method, path, proc, description)
-VALUES ('get', '/entities', 'get_entities', 'entity list');
+INSERT INTO route (method, path, proc, legitimate, description)
+VALUES ('get', '/entities', 'get_entities', '{"every"}', 'entity list');
 ```
 
 test the route
@@ -146,43 +155,48 @@ a simple task flow example session
 $ curl -D - -H "Content-Type: application/json" -d '{"subject":"todo", "description":"something"}' http://localhost:8080/task
 HTTP/1.1 201 Created
 Server: openresty/1.7.2.1
-Date: Mon, 08 Sep 2014 18:43:00 GMT
+Date: Mon, 06 Oct 2014 20:40:04 GMT
 Content-Type: application/json
 Transfer-Encoding: chunked
 Connection: keep-alive
+Set-Cookie: session=NULL; Path=/; Expires=Mon, 06-Oct-14 20:40:04 GMT
 
-{"id" : 1, "status" : "open", "subject" : "todo", "description" : "something", "routes" : {"delete" : "/task/1", "get" : "/task/1", "put" : "/task/1"}}%
+{"id" : 1, "status" : "open", "subject" : "todo", "description" : "something", "routes" : {"get" : "/task/1", "delete" : "/task/1", "put" : "/task/1", "cancel" : "/task/1/cancel", "finish" : "/task/1/finish"}}%
 
 # list all open tasks
 $ curl -D - http://localhost:8080/tasks\?status\=open
 HTTP/1.1 200 OK
 Server: openresty/1.7.2.1
-Date: Mon, 08 Sep 2014 18:43:28 GMT
+Date: Mon, 06 Oct 2014 20:40:41 GMT
 Content-Type: application/json
 Transfer-Encoding: chunked
 Connection: keep-alive
+Set-Cookie: session=NULL; Path=/; Expires=Mon, 06-Oct-14 20:40:41 GMT
 
-{"tasks" : [{"id" : 1, "status" : "open", "subject" : "todo", "description" : "something", "routes" : {"delete" : "/task/1", "get" : "/task/1", "put" : "/task/1"}}], "routes" : {"post" : "/task"}}%
+{"tasks" : [{"id" : 1, "status" : "open", "subject" : "todo", "description" : "something", "routes" : {"get" : "/task/1", "delete" : "/task/1", "put" : "/task/1", "cancel" : "/task/1/cancel", "finish" : "/task/1/finish"}}], "routes" : {"post" : "/task"}}%
 
-# finish the task
-$ curl -D - -X POST http://localhost:8080/task/1/finish
+# finish the task (authenticated)
+$ curl -u er -D - -X POST http://localhost:8080/task/1/finish
+Enter host password for user 'er':
 HTTP/1.1 200 OK
 Server: openresty/1.7.2.1
-Date: Mon, 04 Aug 2014 18:06:07 GMT
+Date: Mon, 06 Oct 2014 20:41:43 GMT
 Content-Type: application/json
 Transfer-Encoding: chunked
 Connection: keep-alive
+Set-Cookie: session=4d2b96d8-2e53-42f6-a977-273fc42aa4fd; Path=/; Expires=Mon, 06-Oct-14 23:18:43 GMT
 
-{"id":1,"status":"done","subject":"todo","description":"something"}% 
+{"id" : 1, "status" : "done", "subject" : "todo", "description" : "something", "routes" : {"get" : "/task/1", "delete" : "/task/1", "put" : "/task/1", "reopen" : "/task/1/reopen"}}%
 
 # there are no open tasks
 $ curl -D - http://localhost:8080/tasks\?status\=open
 HTTP/1.1 200 OK
 Server: openresty/1.7.2.1
-Date: Mon, 08 Sep 2014 18:44:26 GMT
+Date: Mon, 06 Oct 2014 20:42:27 GMT
 Content-Type: application/json
 Transfer-Encoding: chunked
 Connection: keep-alive
+Set-Cookie: session=NULL; Path=/; Expires=Mon, 06-Oct-14 20:42:27 GMT
 
 {"tasks" : [], "routes" : {"post" : "/task"}}%
 
@@ -190,19 +204,58 @@ Connection: keep-alive
 $ curl -D - -d 'subject=todo2&description=something2' http://localhost:8080/task
 HTTP/1.1 201 Created
 Server: openresty/1.7.2.1
-Date: Mon, 08 Sep 2014 18:45:02 GMT
+Date: Mon, 06 Oct 2014 20:42:47 GMT
 Content-Type: application/json
 Transfer-Encoding: chunked
 Connection: keep-alive
+Set-Cookie: session=NULL; Path=/; Expires=Mon, 06-Oct-14 20:42:47 GMT
 
-{"id" : 2, "status" : "open", "subject" : "todo2", "description" : "something2", "routes" : {"delete" : "/task/2", "get" : "/task/2", "put" : "/task/2"}}%
+{"id" : 2, "status" : "open", "subject" : "todo2", "description" : "something2", "routes" : {"get" : "/task/2", "delete" : "/task/2", "put" : "/task/2", "cancel" : "/task/2/cancel", "finish" : "/task/2/finish"}}%
 ```
+
+### Authentication
+
+Supports HTTP basic auth and HTML form based authentication.
+
+#### HTTP Basic Auth
+
+The way to communicate with a HTTP command client or library.
+
+Flow:
+ 1. call of a restricted route, returns 401
+ 2. call it again with HTTP Basic Auth, results in:
+   * 200 with route response and session cookie (logged in)
+   * 400 invalid login call
+   * 403 forbidden (not legitimated)
+ 3. reuse session cookie for additional requests (don't reauthenticate every request)
+ 4. post a /logout with cookie to invalidate the session
+
+#### HTML Form Auth
+
+Typical Browser interaction uses a form based dialog to prevent the hassle of
+invalidating a HTTP basis auth session without JavaScript XHR.
+
+Flow:
+ 1. call of a restricted route, returns 401
+ 2. get /login page and post /authenticate, returns
+   * 200 JSON notice and session cookie (logged in)
+   * 303 HTTP redirect back and session cookie (logged in)
+   * 400 invalid login call
+   * 403 forbidden (not legitimated)
+ 3. Browser reuses session cookie for additional requests
+ 4. post a /logout to invalidate the session
+
+### Authorization
+
+route execution is restricted with a legitimated set of roles
+
+roles type with special entry "every" for public resource access
 
 ### Templates
 
 requires [lua-resty-template][lua-resty-template], the simplest way to install it is `luarocks`
 ```sh
-sudo luarocks install lua-resty-template
+$ sudo luarocks install lua-resty-template
 ```
 
 list all template mappings
@@ -217,17 +270,55 @@ SELECT proc, mime, path, locals FROM template;
 (4 rows)
 ```
 
+### Architecture
+
+internal route proccessing
+
+ 1. NG get cookie session ID
+ 2. NG login with HTTP basic auth > PG login()
+ 3. PG update session
+ 4. PG authorized call
+ 5. NG handle response (render template)
+
+
 ### HTML HTTP REST Hacks for ROCA
 
-The lack of HTTP methods in HTML often has effects on the REST interface.
+The lack of HTTP methods in HTML should have no effects on the REST interface.
+To minify the impact on the business layer there some default behaviours implemented
+for `application/x-www-form-urlencoded` requests.
 
 #### POST HTML form HTTP redirect
 
-A 201 POST response is rewritten to a 303 with the `routes.get` URI.
+201 POST response is rewritten to a 303 with the `routes.get` URI as location.
 
-#### PUT HTML form template redirect
+#### PUT HTML form template
 
-A 200 PUT response and the GET of a resource shares the same URI and JSON structure like `/task/3`.
+200 PUT response and GET of a resource shares the same URI and JSON structure, e.g. `/entity/3`
+and `{"entity":{"name":"an entity"}}`.
+
+GET returns an editable detail form of the entitiy with an hidden input field.
+```html
+<form action="{*data.entity.routes.put*}" method="post">
+  <input name="method" type="hidden" value="put">
+  <input required name="subject" value="{{data.entity.name}}">
+  <button type="submit">Save</button>
+</form>
+```
+
+The Nginx route changes this POST into a PUT request and finally uses the URI to find
+and render a template of the updated entity.
+
+#### DELETE HTML form template and redirect
+
+A 204 DELETE response is rewritten to a 303 with the `routes.next` URI as location.
+
+DELETE request requires an additional HTML form. A possible convention is the `/delete` path suffix.
+```html
+<form action="{*data.routes.confirm*}" method="post">
+  <input name="method" type="hidden" value="delete">
+  <button type="submit">Yes</button>
+</form>
+```
 
 [postgres]: http://www.postgresql.org/
 [pg_apt]: http://wiki.postgresql.org/wiki/Apt

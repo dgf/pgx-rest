@@ -1,0 +1,18 @@
+{(header.html)}
+  <form action="/authenticate" method="post">
+    <input name="back" type="hidden" value="{*data.routes.back*}">
+    <div class="row">
+      <label>Login
+        <input required name="login" placeholder="{{data.placeholder.login}}">
+      </label>
+    </div>
+    <div class="row">
+      <label>Password
+        <input required name="password" placeholder="{{data.placeholder.password}}">
+      </label>
+    </div>
+    <div class="row">
+      <button type="submit">Login</button>
+    </div>
+  </form>
+{(footer.html)}

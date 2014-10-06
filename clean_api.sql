@@ -44,14 +44,19 @@ DROP TABLE    IF EXISTS address;
 DROP TYPE     IF EXISTS status;
 
 -- routing API endpoints
-DROP FUNCTION IF EXISTS call(method, text, json);
-DROP FUNCTION IF EXISTS delete(text);
-DROP FUNCTION IF EXISTS get(text);
+DROP FUNCTION IF EXISTS call(method, text, uuid, json);
 DROP FUNCTION IF EXISTS get_routes(request);
 DROP FUNCTION IF EXISTS get_templates(request);
+DROP FUNCTION IF EXISTS delete(text);
+DROP FUNCTION IF EXISTS delete(text, uuid);
+DROP FUNCTION IF EXISTS get(text);
+DROP FUNCTION IF EXISTS get(text, uuid);
 DROP FUNCTION IF EXISTS post(text);
+DROP FUNCTION IF EXISTS post(text, uuid);
 DROP FUNCTION IF EXISTS post(text, json);
+DROP FUNCTION IF EXISTS post(text, uuid, json);
 DROP FUNCTION IF EXISTS put(text, json);
+DROP FUNCTION IF EXISTS put(text, uuid, json);
 DROP FUNCTION IF EXISTS find_template(text, text);
 DROP FUNCTION IF EXISTS route_action(method, text, text[]);
 DROP FUNCTION IF EXISTS route_action(method, text);
@@ -59,8 +64,23 @@ DROP TRIGGER  IF EXISTS route_path_match ON route;
 DROP FUNCTION IF EXISTS route_path_match();
 DROP TABLE    IF EXISTS template;
 DROP TABLE    IF EXISTS route;
+
+-- auth API
+DROP FUNCTION IF EXISTS add_user(text, text, text, arole[]);
+DROP FUNCTION IF EXISTS json_build_session(asession, auser);
+DROP FUNCTION IF EXISTS form_login(request);
+DROP FUNCTION IF EXISTS post_login(text, text);
+DROP FUNCTION IF EXISTS login(text, text);
+DROP FUNCTION IF EXISTS post_logout(uuid);
+DROP FUNCTION IF EXISTS logout(uuid);
+DROP TABLE    IF EXISTS asession;
+DROP TABLE    IF EXISTS auser;
+
+-- types API
+DROP TYPE     IF EXISTS arole;
 DROP TYPE     IF EXISTS error;
 DROP TYPE     IF EXISTS method;
+DROP TYPE     IF EXISTS http_response;
 DROP TYPE     IF EXISTS response;
 DROP TYPE     IF EXISTS request;
 
