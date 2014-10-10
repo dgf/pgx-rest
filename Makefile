@@ -1,4 +1,4 @@
-db_name=rest_check
+db_name = rest_check
 
 # helper
 
@@ -31,10 +31,10 @@ dashboard: contacts tasks
 	psql $(db_name) -f modules/dashboard.sql
 
 # testing
+SPECS = rest tasks contacts dashboard
 
 test: dashboard
-	psql $(db_name) -f specs/rest.sql
-	psql $(db_name) -f specs/tasks.sql
+	$(foreach spec, $(SPECS), psql $(db_name) -f specs/$(spec).sql 2>&1 | ./reporter.awk;)
 
 application: dashboard
 	psql $(db_name) -f usage.sql

@@ -362,7 +362,7 @@ CREATE FUNCTION public.post_logout(c_session uuid)
   EXCEPTION
     WHEN no_data_found THEN
       RAISE NOTICE 'logout failed %', to_json((SQLSTATE, SQLERRM)::error);
-      RETURN (400, to_json((400, 'logout failed')::error));
+      RETURN (400, to_json((400, 'logout failed')::error))::response;
   END;
 $$ LANGUAGE plpgsql
    -- Everybody can try a logout!
