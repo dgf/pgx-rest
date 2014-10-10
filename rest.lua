@@ -74,7 +74,7 @@ end
 -- create and execute route call query
 -- This query construction is secure as long as the application has only access to the "call" route function!
 if session_id ~= "NULL" then session_id = "'" .. session_id .. "'" end
-local route_call_sql = "SELECT * FROM call('%s'::method, '%s'::text, %s::uuid, '%s'::json)"
+local route_call_sql = "SELECT * FROM call('%s'::text, '%s'::text, %s::uuid, '%s'::json)"
 local route_call_query = string.format(route_call_sql, method, uri, session_id, body)
 local response = misc.capture(route_call_query)
 

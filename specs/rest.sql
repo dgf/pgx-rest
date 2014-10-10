@@ -1,4 +1,5 @@
 -- specifications
+SET search_path TO dashboard, tasks, contacts, rest, public;
 
 BEGIN TRANSACTION;
 DO $$

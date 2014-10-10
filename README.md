@@ -136,6 +136,7 @@ Download, build and install an [OpenResty][openresty] release.
 create an application user with login
 ```SQL
 CREATE USER application WITH NOINHERIT ENCRYPTED PASSWORD 'SecreT';
+ALTER USER application SET search_path = dashboard, contacts, tasks, rest, public;
 ```
 
 adjust credentials in `nginx.conf`

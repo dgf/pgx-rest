@@ -1,4 +1,6 @@
 -- dashboard endpoint with open tasks and contact list
+CREATE SCHEMA dashboard;
+SET search_path TO dashboard, tasks, contacts, rest, public;
 
 INSERT INTO route (method, path, proc, description) VALUES
 ('get', '/', 'get_dashboard', 'index page');

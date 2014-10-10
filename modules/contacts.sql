@@ -1,4 +1,6 @@
 -- contact management example
+CREATE SCHEMA contacts;
+SET search_path TO contacts, rest, public;
 
 INSERT INTO route (method, path, proc, description) VALUES
 ('delete' , '/contact/{id}'          , 'delete_contact'      , 'delete a contact'),

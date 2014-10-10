@@ -1,4 +1,4 @@
--- setup required contrib modules
+-- required contrib modules
 CREATE EXTENSION "pgcrypto";
 CREATE EXTENSION "uuid-ossp";
 

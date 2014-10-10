@@ -1,4 +1,6 @@
 -- task management example
+CREATE SCHEMA tasks;
+SET search_path TO tasks, rest, public;
 
 -- define routes
 INSERT INTO route (method, path, proc, legitimate, description) VALUES

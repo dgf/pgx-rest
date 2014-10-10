@@ -1,4 +1,6 @@
 -- JSON HTTP SQL REST interface
+CREATE SCHEMA rest;
+SET search_path TO rest, public;
 
 -- HTTP methods
 CREATE TYPE method AS ENUM ('get', 'post', 'put', 'delete');
@@ -116,7 +118,7 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER route_path_match BEFORE INSERT OR UPDATE ON route FOR EACH ROW EXECUTE PROCEDURE route_path_match();
 
 -- route an endpoint call
-CREATE FUNCTION call(m method, c_path text, c_session uuid, body json)
+CREATE FUNCTION public.call(c_method text, c_path text, c_session uuid, body json)
   RETURNS http_response AS $$
   DECLARE
     authorized boolean := false;
@@ -137,7 +139,7 @@ CREATE FUNCTION call(m method, c_path text, c_session uuid, body json)
     END IF;
 
     -- fetch route
-    SELECT * FROM route WHERE m = method AND c_path ~ match INTO STRICT r;
+    SELECT * FROM route WHERE method = c_method::method AND c_path ~ match INTO STRICT r;
     IF r.legitimate @> '{"every"}' THEN
       authorized := true;
     ELSE -- authorize
@@ -173,7 +175,7 @@ $$ LANGUAGE plpgsql
    SECURITY DEFINER;
 
 -- template path lookup
-CREATE FUNCTION find_template(r_mime text, r_path text, OUT path text, OUT locals json)
+CREATE FUNCTION public.find_template(r_mime text, r_path text, OUT path text, OUT locals json)
   AS $$ DECLARE r route; t template;
   BEGIN
     SELECT * FROM route WHERE 'get' = method AND r_path ~ match INTO STRICT r;
@@ -190,14 +192,14 @@ $$ LANGUAGE plpgsql
 CREATE FUNCTION get(path text, session uuid)
   RETURNS http_response AS $$
   BEGIN
-    RETURN call('get'::method, path, session, '{}'::json);
+    RETURN call('get', path, session, '{}'::json);
   END;
 $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION get(path text)
   RETURNS http_response AS $$
   BEGIN
-    RETURN call('get'::method, path, NULL, '{}'::json);
+    RETURN call('get', path, NULL, '{}'::json);
   END;
 $$ LANGUAGE plpgsql;
 
@@ -205,14 +207,14 @@ $$ LANGUAGE plpgsql;
 CREATE FUNCTION post(path text, session uuid, body json)
   RETURNS http_response AS $$
   BEGIN
-    RETURN call('post'::method, path, session, body);
+    RETURN call('post', path, session, body);
   END;
 $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION post(path text, body json)
   RETURNS http_response AS $$
   BEGIN
-    RETURN call('post'::method, path, NULL, body);
+    RETURN call('post', path, NULL, body);
   END;
 $$ LANGUAGE plpgsql;
 
@@ -220,14 +222,14 @@ $$ LANGUAGE plpgsql;
 CREATE FUNCTION post(path text, session uuid)
   RETURNS http_response AS $$
   BEGIN
-    RETURN call('post'::method, path, session, '{}'::json);
+    RETURN call('post', path, session, '{}'::json);
   END;
 $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION post(path text)
   RETURNS http_response AS $$
   BEGIN
-    RETURN call('post'::method, path, NULL, '{}'::json);
+    RETURN call('post', path, NULL, '{}'::json);
   END;
 $$ LANGUAGE plpgsql;
 
@@ -235,14 +237,14 @@ $$ LANGUAGE plpgsql;
 CREATE FUNCTION put(path text, session uuid, body json)
   RETURNS http_response AS $$
   BEGIN
-    RETURN call('put'::method, path, session, body);
+    RETURN call('put', path, session, body);
   END;
 $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION put(path text, body json)
   RETURNS http_response AS $$
   BEGIN
-    RETURN call('put'::method, path, NULL, body);
+    RETURN call('put', path, NULL, body);
   END;
 $$ LANGUAGE plpgsql;
 
@@ -250,14 +252,14 @@ $$ LANGUAGE plpgsql;
 CREATE FUNCTION delete(path text, session uuid)
   RETURNS http_response AS $$
   BEGIN
-    RETURN call('delete'::method, path, session, '{}'::json);
+    RETURN call('delete', path, session, '{}'::json);
   END;
 $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION delete(path text)
   RETURNS http_response AS $$
   BEGIN
-    RETURN call('delete'::method, path, NULL, '{}'::json);
+    RETURN call('delete', path, NULL, '{}'::json);
   END;
 $$ LANGUAGE plpgsql;
 
@@ -305,7 +307,7 @@ INSERT INTO template (proc, mime, path, locals) VALUES
 ('get_templates', 'html', 'rest/templates.html', '{"title":"Published templates"}'::json);
 
 -- HTTP Basic authentication request
-CREATE FUNCTION login(u_login text, u_basic_auth text)
+CREATE FUNCTION public.login(u_login text, u_basic_auth text)
   RETURNS http_response AS $$ DECLARE s asession; u auser;
   BEGIN
     SELECT * FROM auser WHERE login = u_login AND http_basic = u_basic_auth INTO STRICT u;
@@ -321,7 +323,7 @@ $$ LANGUAGE plpgsql
    SECURITY DEFINER;
 
 -- HTML form login post request
-CREATE FUNCTION post_login(u_login text, u_password text)
+CREATE FUNCTION public.post_login(u_login text, u_password text)
   RETURNS http_response AS $$ DECLARE res http_response;
   BEGIN
     SELECT * FROM login(u_login, encode(concat_ws(':', u_login, u_password)::bytea, 'base64')) INTO res;
@@ -349,7 +351,7 @@ CREATE FUNCTION logout(c_session uuid)
 $$ LANGUAGE plpgsql;
 
 -- HTTP auth logout request
-CREATE FUNCTION post_logout(c_session uuid)
+CREATE FUNCTION public.post_logout(c_session uuid)
   RETURNS response AS $$
   BEGIN
     PERFORM logout(c_session);
