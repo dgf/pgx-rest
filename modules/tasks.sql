@@ -98,6 +98,14 @@ CREATE FUNCTION delete_task(t_id int)
   END;
 $$ LANGUAGE plpgsql;
 
+CREATE FUNCTION get_open_tasks()
+  RETURNS int AS $$ DECLARE c int;
+  BEGIN
+    SELECT count(*) FROM task WHERE status = 'open' INTO c;
+    RETURN c;
+  END;
+$$ LANGUAGE plpgsql;
+
 CREATE FUNCTION finish_task(t_id int)
   RETURNS task AS $$ DECLARE t task;
   BEGIN

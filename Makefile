@@ -2,22 +2,31 @@ db_name = rest_check
 
 # helper
 
-init:
+targets:	# list all targets
+	@grep '^[^#[:space:]].*:' Makefile
+
+init: 		# create database
 	createdb $(db_name)
 
-cli:
+cli: 		# connect Postgres terminal
 	psql $(db_name)
 
-setup:
+setup:		# setup Postgres extensions
 	psql $(db_name) -f setup.sql
 
 # base
 
-clean:
+clean:		# clean database
 	psql $(db_name) -f clean.sql
 
-rest: clean
+rest: clean	# install REST schema
 	psql $(db_name) -f rest.sql
+
+# testing
+SPECS = rest tasks contacts application
+
+test: application # run specifations
+	$(foreach spec, $(SPECS), psql $(db_name) -f specs/$(spec).sql 2>&1 | ./reporter.awk;)
 
 # modules
 
@@ -27,15 +36,6 @@ tasks: rest
 contacts: rest
 	psql $(db_name) -f modules/contacts.sql
 
-dashboard: contacts tasks
-	psql $(db_name) -f modules/dashboard.sql
-
-# testing
-SPECS = rest tasks contacts dashboard
-
-test: dashboard
-	$(foreach spec, $(SPECS), psql $(db_name) -f specs/$(spec).sql 2>&1 | ./reporter.awk;)
-
-application: dashboard
-	psql $(db_name) -f usage.sql
+application: tasks contacts
+	psql $(db_name) -f modules/application.sql
 

@@ -1,5 +1,7 @@
--- specifications
-SET search_path TO dashboard, tasks, contacts, rest, public;
+-- example application specification
+
+-- requires all module paths of globals() call
+SET search_path TO application, tasks, contacts, rest, public;
 
 BEGIN TRANSACTION;
 DO $$
@@ -10,10 +12,9 @@ DO $$
   BEGIN
 
     BEGIN
-      RAISE INFO 'SPEC: dashboard';
+      RAISE INFO 'SPEC: application';
       PERFORM create_contact('Danny Gräf', 'Auf der Wiese 17', '12372', 'Berlin');
       PERFORM create_task('keep on going', 'live every day to its fullest');
-      PERFORM add_user('er', 'secret', 'test user', '{"user"}');
     END;
 
     BEGIN
@@ -22,7 +23,7 @@ DO $$
       IF res.code = 200 AND json_array_length(res.data->'contacts') = 1 AND json_array_length(res.data->'tasks') = 1 THEN
         RAISE INFO 'OK: % %', res.code, res.data;
       ELSE
-        RAISE 'dashboard content expected, got: % %', res.code, res.data;
+        RAISE 'homepage content expected, got: % %', res.code, res.data;
       END IF;
     END;
   END;

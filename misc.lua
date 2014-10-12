@@ -19,9 +19,13 @@ function render_error(response)
 
   -- render error page
   local value = { title = response.code .. " Error" }
-  local rsession = cjson.decode(response.session)
-  if rsession and rsession ~= cjson.null then
-    value.session = rsession
+  local session = cjson.decode(response.session)
+  if session and session ~= cjson.null then
+    value.session = session
+  end
+  local globals = cjson.decode(response.globals)
+  if globals and globals ~= cjson.null then
+    value.globals = globals
   end
   local rerror = cjson.decode(response.data)
   if rerror ~= cjson.null then

@@ -1,5 +1,7 @@
--- specifications
-SET search_path TO contacts, rest, public;
+-- contact management specification
+
+-- requires all module paths of globals() call
+SET search_path TO application, tasks, contacts, rest, public;
 
 BEGIN TRANSACTION;
 DO $$
@@ -12,7 +14,6 @@ DO $$
     BEGIN
       RAISE INFO 'SPEC: contact management';
       PERFORM create_contact('Danny Gräf', 'Auf der Wiese 17', '12372', 'Berlin');
-      PERFORM add_user('er', 'secret', 'test user', '{"user"}');
     END;
 
     BEGIN

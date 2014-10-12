@@ -25,19 +25,29 @@ $ make init
 $ make setup
 ```
 
-import all examples
+create example application
 ```sh
-$ make dashboard
+$ make application
+```
+
+list all existing targets
+```sh
+$ make
+targets:	# list all targets
+init: 		# create database
+cli: 		# connect Postgres terminal
+setup:		# setup Postgres extensions
+clean:		# clean database
+rest: clean	# install REST schema
+test: application # run specifations
+tasks: rest
+contacts: rest
+application: tasks contacts documents
 ```
 
 ## Usage
 
-The example application ships a simple task and contact management with a dashboard.
-
-start a psql client connection
-```sh
-make cli
-```
+The example application contains a rudimentary task and contact management.
 
 list all existing routes
 ```SQL
@@ -136,7 +146,7 @@ Download, build and install an [OpenResty][openresty] release.
 create an application user with login
 ```SQL
 CREATE USER application WITH NOINHERIT ENCRYPTED PASSWORD 'SecreT';
-ALTER USER application SET search_path = dashboard, contacts, tasks, rest, public;
+ALTER USER application SET search_path = application, contacts, tasks, rest, public;
 ```
 
 adjust credentials in `nginx.conf`

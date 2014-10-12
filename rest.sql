@@ -20,15 +20,16 @@ CREATE TYPE request AS (
 
 -- REST response
 CREATE TYPE response AS (
-  code        int, -- HTTP status code like 201, 404, 500
-  data        json -- JSON result object or error message
+  code        int,  -- HTTP status code like 201, 404, 500
+  data        json  -- JSON result object or error message
 );
 
 -- HTTP response
 CREATE TYPE http_response AS (
   code        int,  -- HTTP status code like 201, 404, 500
-  session     json, -- HTTP session with user, roles and expiration
-  data        json  -- JSON result object or error message
+  globals     json, -- application globals (result of asettings globals function)
+  session     json, -- session with user, roles and expiration
+  data        json  -- result object or error message
 );
 
 -- application role
@@ -53,9 +54,16 @@ CREATE TABLE asession (
   UNIQUE (session)
 );
 
+-- application settings
+CREATE TABLE asetting (
+  id       int    PRIMARY KEY DEFAULT 1, CHECK (id = 1), -- supports only one settings row
+  app_name text   NOT NULL, -- application name
+  globals  text   NOT NULL  -- function for global template data like layout routes
+);
+
 -- HTTP route
 CREATE TABLE route (
-  id          serial PRIMARY KEY,
+  id          serial  PRIMARY KEY,
   method      method  NOT NULL DEFAULT 'get',
   path        text    NOT NULL, -- request path with params
   proc        text    NOT NULL, -- function to call
@@ -117,13 +125,26 @@ CREATE FUNCTION route_path_match()
 $$ LANGUAGE plpgsql;
 CREATE TRIGGER route_path_match BEFORE INSERT OR UPDATE ON route FOR EACH ROW EXECUTE PROCEDURE route_path_match();
 
+-- get application globals
+CREATE FUNCTION globals()
+  RETURNS json AS $$ DECLARE g json; s asetting;
+  BEGIN
+    SELECT * FROM asetting INTO STRICT s;
+    EXECUTE 'SELECT * FROM '||quote_ident(s.globals)||'($1)' USING s INTO STRICT g;
+    RETURN g;
+  EXCEPTION
+    WHEN no_data_found THEN
+      RAISE 'invalid application settings (see application.asettings table and test global function reference)';
+  END;
+$$ LANGUAGE plpgsql;
+
 -- route an endpoint call
 CREATE FUNCTION public.call(c_method text, c_path text, c_session uuid, body json)
   RETURNS http_response AS $$
   DECLARE
     authorized boolean := false;
     r route; s asession; u auser;
-    res response; req request;
+    g json; res response; req request;
     pns text[]; pvs text[]; rs json;
   BEGIN
     -- update session and fetch user
@@ -138,13 +159,16 @@ CREATE FUNCTION public.call(c_method text, c_path text, c_session uuid, body jso
       rs = json_build_session(s, u);
     END IF;
 
+    -- fetch globals
+    SELECT * FROM globals() INTO STRICT g;
+
     -- fetch route
     SELECT * FROM route WHERE method = c_method::method AND c_path ~ match INTO STRICT r;
     IF r.legitimate @> '{"every"}' THEN
       authorized := true;
     ELSE -- authorize
       IF s IS NULL THEN -- not authenticated
-        RETURN (401, rs, to_json(('unauthenticated', 'authentication required')::error));
+        RETURN (401, g, rs, to_json(('unauthenticated', 'authentication required')::error));
       ELSE
         IF r.legitimate && u.roles THEN -- authorized
           authorized := true;
@@ -153,7 +177,7 @@ CREATE FUNCTION public.call(c_method text, c_path text, c_session uuid, body jso
     END IF;
 
     IF NOT authorized THEN
-      RETURN (403, rs, to_json(('forbidden', 'authorization required')::error));
+      RETURN (403, g, rs, to_json(('forbidden', 'authorization required')::error));
     ELSE
       -- map param names and values
       IF array_length(r.params, 1) IS NULL THEN
@@ -164,11 +188,11 @@ CREATE FUNCTION public.call(c_method text, c_path text, c_session uuid, body jso
       END IF;
       -- execute authorized function call
       EXECUTE 'SELECT * FROM '||quote_ident(r.proc)||'($1)' USING req INTO STRICT res;
-      RETURN (res.code, rs, res.data);
+      RETURN (res.code, g, rs, res.data);
     END IF;
   EXCEPTION
-    WHEN no_data_found THEN RETURN (404, rs, to_json((SQLSTATE, SQLERRM)::error));
-    WHEN OTHERS THEN RETURN (500, rs, to_json((SQLSTATE, SQLERRM)::error));
+    WHEN no_data_found THEN RETURN (404, g, rs, to_json((SQLSTATE, SQLERRM)::error));
+    WHEN OTHERS THEN RETURN (500, g, rs, to_json((SQLSTATE, SQLERRM)::error));
   END;
 $$ LANGUAGE plpgsql
    -- This grants the access to all published routes!
@@ -308,15 +332,18 @@ INSERT INTO template (proc, mime, path, locals) VALUES
 
 -- HTTP Basic authentication request
 CREATE FUNCTION public.login(u_login text, u_basic_auth text)
-  RETURNS http_response AS $$ DECLARE s asession; u auser;
+  RETURNS http_response AS $$ DECLARE g json; s asession; u auser;
   BEGIN
+    SELECT * FROM globals() INTO STRICT g;
     SELECT * FROM auser WHERE login = u_login AND http_basic = u_basic_auth INTO STRICT u;
     INSERT INTO asession (user_id) VALUES (u.id) RETURNING * INTO STRICT s;
-    RETURN (200, json_build_session(s, u), json_build_object('notice', json_build_object('level', 'info', 'message', 'logged in')));
+    RETURN (200, g, json_build_session(s, u), json_build_object(
+      'notice', json_build_object('level', 'info', 'message', 'logged in'))
+    );
   EXCEPTION
     WHEN no_data_found THEN
       RAISE NOTICE 'login failed %', to_json((SQLSTATE, SQLERRM)::error);
-      RETURN (400, 'null'::json, to_json((400, 'login failed')::error));
+      RETURN (400, g, 'null'::json, to_json((400, 'login failed')::error));
   END;
 $$ LANGUAGE plpgsql
    -- Everybody can try to login!

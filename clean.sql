@@ -5,7 +5,7 @@ DROP FUNCTION IF EXISTS login(u_login text, u_basic_auth text);
 DROP FUNCTION IF EXISTS post_login(u_login text, u_password text);
 DROP FUNCTION IF EXISTS post_logout(c_session uuid);
 
-DROP SCHEMA dashboard CASCADE;
+DROP SCHEMA application CASCADE;
 DROP SCHEMA contacts CASCADE;
 DROP SCHEMA tasks CASCADE;
 DROP SCHEMA rest CASCADE;

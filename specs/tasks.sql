@@ -1,5 +1,7 @@
--- specifications
-SET search_path TO tasks, rest, public;
+-- task management specification
+
+-- requires all module paths of globals() call
+SET search_path TO application, tasks, contacts, rest, public;
 
 BEGIN TRANSACTION;
 DO $$
@@ -12,7 +14,6 @@ DO $$
     BEGIN
       RAISE INFO 'SPEC: task management';
       PERFORM create_task('keep on going', 'live every day to its fullest');
-      PERFORM add_user('er', 'secret', 'test user', '{"user"}');
     END;
 
     BEGIN
@@ -66,7 +67,9 @@ DO $$
     BEGIN
       RAISE INFO 'TEST: PUT 404 /task';
       SELECT * FROM put('/task/'||nextval('task_id_seq'), sid, '{"subject":123}'::json) INTO res;
-      IF res.code = 404 AND (res.session->>'id')::uuid = sid THEN
+      IF res.code = 404
+        AND (res.session->>'id')::uuid = sid
+        AND json_typeof(res.globals) = 'object' THEN
         RAISE INFO 'OK: % %', res.code, res.data;
       ELSE
         RAISE 'not found expected, got: % %', res.code, res.data;

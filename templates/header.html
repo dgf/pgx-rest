@@ -6,6 +6,14 @@
   <link rel="stylesheet" href="/assets/screen.css">
 </head>
 <body>
+<header>
+  <h1><a href="{*globals.routes.index*}">{{globals.app_name}}</a></h1>
+  <nav>
+    <ul class="routes">
+      <li><a href="{*globals.routes.contacts*}">Contacts</a></li>
+      <li><span class="info">{{globals.open_tasks}}</span><a href="{*globals.routes.tasks*}">Tasks</a></li>
+    </ul>
+  </nav>
   <div class="profile">
 {% if session and session.user then %}
     <form action="/logout" method="post">
@@ -16,6 +24,8 @@
     <a href="/login">Login</a>
 {% end %}
   </div>
+</header>
+<main>
   <h1>{{title}}</h1>
 {% if data and data.notice then %}
   <div class="notice {{data.notice.level}}">{{data.notice.message}}</div>

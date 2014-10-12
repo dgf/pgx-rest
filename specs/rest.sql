@@ -1,5 +1,7 @@
--- specifications
-SET search_path TO rest, public;
+-- REST API specification
+
+-- requires all module paths of globals() call
+SET search_path TO application, tasks, contacts, rest, public;
 
 BEGIN TRANSACTION;
 DO $$
@@ -11,8 +13,6 @@ DO $$
 
     BEGIN
       RAISE INFO 'SPEC: REST interface';
-      PERFORM add_user('icke', 'secret', 'test administrator', '{"admin", "user"}');
-      PERFORM add_user('er', 'secret', 'test user', '{"user"}');
     END;
 
     -- TEST SQL template function
@@ -50,17 +50,22 @@ DO $$
     BEGIN
       RAISE INFO 'TEST: login with invalid credentials';
       SELECT * FROM login('unknown', encode('unknown:secret', 'base64')) INTO STRICT res;
-      IF res.code = 400 AND json_typeof(res.data) = 'object' THEN
+      IF res.code = 400
+        AND json_typeof(res.data) = 'object'
+        AND json_typeof(res.globals) = 'object' THEN
         RAISE INFO 'OK: % %', res.code, res.data;
       ELSE
-        RAISE 'session expected, got: % % %', res.code, res.session, res.data;
+        RAISE 'bad request expected, got: % % %', res.code, res.session, res.data;
       END IF;
     END;
 
     BEGIN
       RAISE INFO 'TEST: login as admin';
       SELECT * FROM login('icke', encode('icke:secret', 'base64')) INTO STRICT res;
-      IF res.code = 200 AND length(res.session->>'id') = 36 AND res.data->'notice'->>'level' = 'info' THEN
+      IF res.code = 200
+        AND length(res.session->>'id') = 36
+        AND res.data->'notice'->>'level' = 'info'
+        AND json_typeof(res.globals) = 'object' THEN
         RAISE INFO 'OK: % %', res.code, res.data;
       ELSE
         RAISE 'session expected, got: % % %', res.code, res.session, res.data;
@@ -74,7 +79,9 @@ DO $$
     BEGIN
       RAISE INFO 'TEST: GET 200 /routes';
       SELECT * FROM get('/routes', sid) INTO STRICT res;
-      IF res.code = 200 AND json_array_length(res.data->'routes') > 0 THEN
+      IF res.code = 200
+        AND json_array_length(res.data->'routes') > 0
+        AND json_typeof(res.globals) = 'object' THEN
         RAISE INFO 'OK: % routes', json_array_length(res.data->'routes');
       ELSE
         RAISE 'route list expected, got: % %', res.code, res.data;
@@ -84,7 +91,9 @@ DO $$
     BEGIN
       RAISE INFO 'TEST: GET 401 /routes unauthenticated';
       SELECT * FROM get('/routes') INTO STRICT res;
-      IF res.code = 401 AND res.data->>'state' = 'unauthenticated' THEN
+      IF res.code = 401
+        AND res.data->>'state' = 'unauthenticated'
+        AND json_typeof(res.globals) = 'object' THEN
         RAISE INFO 'OK: % %', res.code, res.data;
       ELSE
         RAISE 'authentication fail expected, got: % %', res.code, res.data;
@@ -97,7 +106,9 @@ DO $$
       UPDATE asession SET expires = now() - INTERVAL '1 minute' WHERE session = sid;
       -- use expired session
       SELECT * FROM get('/routes', sid) INTO STRICT res;
-      IF res.code = 401 AND res.data->>'state' = 'unauthenticated' THEN
+      IF res.code = 401
+        AND res.data->>'state' = 'unauthenticated'
+        AND json_typeof(res.globals) = 'object' THEN
         RAISE INFO 'OK: % %', res.code, res.data;
       ELSE
         RAISE 'expiration fail expected, got: % %', res.code, res.data;
@@ -150,7 +161,9 @@ DO $$
     BEGIN
       RAISE INFO 'TEST: GET 403 /routes';
       SELECT * FROM get('/routes', sid) INTO STRICT res;
-      IF res.code = 403 AND res.data->>'state' = 'forbidden' THEN
+      IF res.code = 403
+        AND res.data->>'state' = 'forbidden'
+        AND json_typeof(res.globals) = 'object' THEN
         RAISE INFO 'OK: % %', res.code, res.data;
       ELSE
         RAISE 'forbidden access expected, got: % %', res.code, res.data;

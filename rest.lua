@@ -130,12 +130,16 @@ else
     ngx.status = response.code
     ngx.print(response.data)
 
-  -- render template with locals and response data
+  -- render template with locals, globals and response data
   else
     local value = cjson.decode(template.locals)
     value.data = cjson.decode(response.data)
     if session ~= cjson.null then
       value.session = session
+    end
+    local globals = cjson.decode(response.globals)
+    if globals and globals ~= cjson.null then
+      value.globals = globals
     end
 
     -- add the back route action
