@@ -149,10 +149,7 @@ CREATE FUNCTION get_task(req request)
   RETURNS response AS $$ DECLARE t task;
   BEGIN
     SELECT * FROM task WHERE id = (req.params->>'id')::int INTO STRICT t;
-    RETURN (200, json_build_object(
-      'task', json_build_task(t)
-    , 'routes', json_build_object('list', route_action('get', 'get_tasks')))
-    );
+    RETURN (200, json_build_object('task', json_build_task(t)));
    END;
 $$ LANGUAGE plpgsql;
 
@@ -219,8 +216,7 @@ CREATE FUNCTION put_task(req request)
     t := update_task((req.params->>'id')::int, req.body->>'subject', req.body->>'description');
     RETURN (200, json_build_object(
       'task', json_build_task(t)
-    , 'notice', json_build_object('level', 'info', 'message', 'task updated')
-    , 'routes', json_build_object('list', route_action('get', 'get_tasks')))
+    , 'notice', json_build_object('level', 'info', 'message', 'task updated'))
     );
   EXCEPTION
     WHEN integrity_constraint_violation THEN
@@ -235,9 +231,7 @@ CREATE FUNCTION form_post_task(req request)
   BEGIN
     RETURN (200, json_build_object(
       'placeholder', json_build_object('subject', 'What?', 'description', 'Why How for Whom?')
-    , 'routes', json_build_object(
-        'list', route_action('get', 'get_tasks')
-      , 'post', route_action('post', 'post_task')))
+    , 'routes', json_build_object('post', route_action('post', 'post_task')))
     );
   END;
 $$ LANGUAGE plpgsql;

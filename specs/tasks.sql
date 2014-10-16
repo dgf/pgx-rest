@@ -32,12 +32,10 @@ DO $$
     BEGIN
       RAISE INFO 'TEST: POST 400 /task';
       SELECT * FROM post('/task', sid, '{"subject": "to", "description": "do"}'::json) INTO res;
-      IF res.code != 400 THEN
-        RAISE 'bad request expected, got: % %', res.code, res.data;
-      ELSIF res.data->>'message' !~ 'task_subject_check' THEN
-        RAISE 'subject violation expected, got: % %', res.code, res.data;
-      ELSE
+      IF res.code = 400 AND res.data->>'message' ~ 'task_subject_check' THEN
         RAISE INFO 'OK: % %', res.code, res.data;
+      ELSE
+        RAISE 'bad request expected, got: % %', res.code, res.data;
       END IF;
     END;
 
@@ -60,7 +58,7 @@ DO $$
       IF res.code = 200 AND res.data->'task'->>'id' = ref->>'id' AND (res.session->>'id')::uuid = sid THEN
         RAISE INFO 'OK: % %', res.code, res.data;
       ELSE
-        RAISE 'task details expected, got: % %', res.code, res.data;
+        RAISE 'task details expected, got: % % %', res.code, res.session, res.data;
       END IF;
     END;
 
