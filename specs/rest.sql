@@ -1,7 +1,7 @@
 -- REST API specification
 
 -- requires all module paths of globals() call
-SET search_path TO application, tasks, contacts, rest, public;
+SET search_path TO application, tasks, contacts, files, rest, public;
 
 BEGIN TRANSACTION;
 DO $$

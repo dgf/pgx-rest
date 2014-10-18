@@ -5,6 +5,11 @@ local cjson = require("cjson.safe")
 local rparser = require("rds.parser")
 local rtemplate = require("resty.template")
 
+-- string helper, starts with?
+function starts_with(string, start)
+  return string.sub(string, 1, string.len(start)) == start
+end
+
 -- HTML error response
 function render_error(response)
   ngx.status = response.code
@@ -56,12 +61,12 @@ function db_capture(query)
 
   -- return response
   return body.resultset[1]
-
 end
 
 -- export misc functions
 return {
   capture = db_capture,
-  error = render_error
+  error = render_error,
+  starts_with = starts_with
 }
 

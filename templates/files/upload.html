@@ -1,0 +1,17 @@
+{(header.html)}
+  <form action="{*data.routes.upload*}" method="post" enctype="multipart/form-data">
+    <div class="row">
+      <label>File
+        <input required name="file" type="file">
+      </label>
+    </div>
+    <div class="row">
+      <label>Description
+        <textarea name="description" placeholder="{{data.placeholder.description}}"></textarea>
+      </label>
+    </div>
+    <div class="row">
+      <button type="submit">Upload</button>
+    </div>
+  </form>
+{(footer.html)}

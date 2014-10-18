@@ -1,0 +1,34 @@
+{(header.html)}
+  <form action="{*data.file.routes.put*}" method="post">
+    <input name="method" type="hidden" value="put">
+    <div class="row">
+      <label>Filename
+        <input required name="name" value="{{data.file.name}}">
+      </label>
+    </div>
+    <div class="row">
+      <label>MIME type
+        <span>{{data.file.mime}}</span>
+      </label>
+    </div>
+    <div class="row">
+      <label>Owner
+        <span>{{data.owner}}</span>
+      </label>
+    </div>
+    <div class="row">
+      <ul class="actions">
+        <li><a href="{*data.file.routes.download*}">Download</a></li>
+        <li><a href="{*data.file.routes.get*}/delete">Delete</a></li>
+      </ul>
+    </div>
+    <div class="row">
+      <label>Description
+        <textarea name="description">{{data.file.description}}</textarea>
+      </label>
+    </div>
+    <div class="row">
+      <button type="submit">Save</button>
+    </div>
+  </form>
+{(footer.html)}

@@ -41,8 +41,9 @@ clean:		# clean database
 rest: clean	# install REST schema
 test: application # run specifations
 tasks: rest
+files: rest
 contacts: rest
-application: tasks contacts documents
+application: files tasks contacts
 ```
 
 ## Usage
@@ -54,13 +55,19 @@ list all existing routes
 SELECT method, path, proc, legitimate, description FROM route ORDER by path, method;
  method |          path          |         proc          | legitimate |             description              
 --------+------------------------+-----------------------+------------+--------------------------------------
- get    | /                      | get_dashboard         | {every}    | index page
+ get    | /                      | homepage              | {every}    | index page
  post   | /contact               | post_contact          | {every}    | create a contact
  get    | /contact/{id}          | get_contact           | {every}    | contact details
  put    | /contact/{id}          | put_contact           | {every}    | update contact details
  delete | /contact/{id}          | delete_contact        | {every}    | delete a contact
  put    | /contact/{id}/address  | put_contact_address   | {every}    | update contact address
  get    | /contacts              | get_contacts          | {every}    | contact list
+ get    | /file                  | form_upload           | {every}    | file upload form
+ get    | /file/{id}             | get_file              | {every}    | file details page
+ put    | /file/{id}             | put_file              | {every}    | update file meta data
+ delete | /file/{id}             | delete_file           | {every}    | delete a file
+ get    | /file/{id}/delete      | form_delete_file      | {every}    | confirm file delete
+ get    | /files                 | get_files             | {every}    | file list
  get    | /login                 | form_login            | {every}    | login form
  get    | /routes                | get_routes            | {admin}    | list all published routes
  get    | /task                  | form_post_task        | {every}    | template route of task creation form
@@ -78,7 +85,6 @@ SELECT method, path, proc, legitimate, description FROM route ORDER by path, met
  get    | /tasks                 | get_tasks             | {every}    | all tasks
  get    | /tasks?status={status} | get_tasks             | {every}    | filter tasks
  get    | /templates             | get_templates         | {admin}    | list all published templates
-(24 rows)
 ```
 
 create a new task
@@ -90,16 +96,16 @@ SELECT data FROM post('/task', '{"subject": "todo", "description": "something"}'
 
 ## Public API routes
 
- * generic route execution: `call(method, text, uuid, json)`
-   example GET request: `SELECT * FROM call('get', '/tasks', NULL, NULL);`
- * template resolver: ```find_template(text, text)```
-   example call: ```SELECT * FROM find_template('html', '/tasks');```
- * HTTP basic login: `login(text, text)`
-   example query: ```SELECT * FROM login('icke', encode(concat_ws(':', u_login, u_password)::bytea, 'base64'));```
- * HTML form POST login: ```post_login(text, text)```
-   example query: ```SELECT * FROM post_login('icke', 'secret');```
- * HTTP logout POST route: ```post_logout(uuid)```
-   example query: ```SELECT * FROM post_logout(uuid_generate_v4());```
+ * generic route execution: ```SELECT * FROM call('get', '/tasks', NULL, NULL);```
+ * template resolver: ```SELECT * FROM find_template('html', '/tasks');```
+ * HTTP basic login: ```SELECT * FROM login('icke', encode(concat_ws(':', u_login, u_password)::bytea, 'base64'));```
+ * HTML form POST login: ```SELECT * FROM post_login('icke', 'secret');```
+ * HTTP logout POST route: ```SELECT * FROM post_logout(sid);```
+
+### Public file module access
+
+ * HTML form POST upload: ```SELECT * FROM upload(sid, 'a.txt', 'text/plain', 'a file', 'text data')```
+ * HTTP download GET route: ```SELECT * FROM download(sid, 1)```
 
 ## Development
 
@@ -146,7 +152,7 @@ Download, build and install an [OpenResty][openresty] release.
 create an application user with login
 ```SQL
 CREATE USER application WITH NOINHERIT ENCRYPTED PASSWORD 'SecreT';
-ALTER USER application SET search_path = application, contacts, tasks, rest, public;
+ALTER USER application SET search_path = application, contacts, tasks, files, rest, public;
 ```
 
 adjust credentials in `nginx.conf`

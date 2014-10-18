@@ -1,6 +1,6 @@
 -- application endpoint with open tasks and contact list
 CREATE SCHEMA application;
-SET search_path TO application, tasks, contacts, rest, public;
+SET search_path TO application, tasks, contacts, files, rest, public;
 
 -- predefine application settings
 INSERT INTO asetting (app_name, globals) VALUES
@@ -33,8 +33,9 @@ CREATE FUNCTION get_configuration(s asetting)
     , 'open_tasks', get_open_tasks()
     , 'routes', json_build_object(
         'index', route_action('get', 'homepage')
-      , 'tasks', route_action('get', 'get_tasks')
-      , 'contacts', route_action('get', 'get_contacts'))
+      , 'contacts', route_action('get', 'get_contacts')
+      , 'files', route_action('get', 'get_files')
+      , 'tasks', route_action('get', 'get_tasks'))
     );
   END;
 $$ LANGUAGE plpgsql;

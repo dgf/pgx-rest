@@ -23,7 +23,7 @@ rest: clean	# install REST schema
 	psql $(db_name) -f rest.sql
 
 # testing
-SPECS = rest tasks contacts application
+SPECS = rest files tasks contacts application
 
 test: application # run specifations
 	$(foreach spec, $(SPECS), psql $(db_name) -f specs/$(spec).sql 2>&1 | ./reporter.awk;)
@@ -33,9 +33,12 @@ test: application # run specifations
 tasks: rest
 	psql $(db_name) -f modules/tasks.sql
 
+files: rest
+	psql $(db_name) -f modules/files.sql
+
 contacts: rest
 	psql $(db_name) -f modules/contacts.sql
 
-application: tasks contacts
+application: files tasks contacts
 	psql $(db_name) -f modules/application.sql
 

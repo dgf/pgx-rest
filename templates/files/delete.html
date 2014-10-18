@@ -1,0 +1,8 @@
+{(header.html)}
+  <form action="{*data.file.routes.delete*}" method="post">
+    <input name="method" type="hidden" value="delete">
+    <p>Delete "{{data.file.name}}"?</p>
+    <button type="submit">Yes</button>
+    <a class="button" href="{*data.routes.back*}">No</a>
+  </form>
+{(footer.html)}

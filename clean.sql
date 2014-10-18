@@ -8,5 +8,6 @@ DROP FUNCTION IF EXISTS post_logout(c_session uuid);
 DROP SCHEMA application CASCADE;
 DROP SCHEMA contacts CASCADE;
 DROP SCHEMA tasks CASCADE;
+DROP SCHEMA files CASCADE;
 DROP SCHEMA rest CASCADE;
 

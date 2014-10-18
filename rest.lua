@@ -53,7 +53,7 @@ if method == "post" or method == "put" then
 
   -- unsupported call, e.g. post multipart/form-data
   else
-    error("unsupported " .. method .. " " .. ctype .. " call")
+    -- ignore it
   end
 end
 

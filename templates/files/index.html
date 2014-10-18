@@ -1,0 +1,26 @@
+{(header.html)}
+  <a href="{*data.routes.upload*}">Upload a file</a>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>MIME</th>
+        <th>Actions</th>
+      <tr>
+    </thead>
+    <tbody>
+{% for _, file in ipairs(data.files) do %}
+      <tr>
+        <td><a href="{*file.routes.get*}">{{file.name}}</a></td>
+        <td>{{file.mime}}</td>
+        <td>
+          <ul class="actions">
+            <li><a href="{*file.routes.download*}">Download</a></li>
+            <li><a href="{*file.routes.get*}/delete">Delete</a></li>
+          </ul>
+        </td>
+      </tr>
+{% end %}
+    </tbody>
+  </table>
+{(footer.html)}
