@@ -5,10 +5,11 @@ local rparser = require("rds.parser")
 
 -- only accept POST request
 if string.lower(ngx.req.get_method()) ~= "post" then
-  error("invalid login call")
+  error("invalid login call, method: " .. ngx.req.get_method())
 end
 
 -- get POST args or body data
+ngx.req.read_body()
 local body = ngx.req.get_post_args()
 if ngx.req.get_headers().content_type ~= "application/x-www-form-urlencoded" then
   body = ngx.req.get_body_data()

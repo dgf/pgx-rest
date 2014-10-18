@@ -107,6 +107,18 @@ CREATE FUNCTION json_build_session(s asession, u auser)
   END;
 $$ LANGUAGE plpgsql;
 
+-- fetch and refresh a session
+CREATE FUNCTION refresh_session(c_session uuid)
+  RETURNS asession AS $$ DECLARE s asession;
+  BEGIN
+    IF c_session IS NOT NULL THEN
+      UPDATE asession SET expires = now() + INTERVAL '37 minute'
+      WHERE session = c_session AND expires > now() RETURNING * INTO s;
+    END IF;
+    RETURN s;
+  END;
+$$ LANGUAGE plpgsql;
+
 -- prepare route path matches
 CREATE FUNCTION route_path_match()
   RETURNS trigger AS $$ DECLARE path text; params text[];
@@ -143,26 +155,20 @@ CREATE FUNCTION public.call(c_method text, c_path text, c_session uuid, body jso
   RETURNS http_response AS $$
   DECLARE
     authorized boolean := false;
-    r route; s asession; u auser;
-    g json; res response; req request;
-    pns text[]; pvs text[]; rs json;
+    r route; req request; res response;
+    s asession; u auser;
+    pns text[]; pvs text[];
+    g json; rs json;
   BEGIN
-    -- update session and fetch user
-    IF c_session IS NOT NULL THEN
-      UPDATE asession SET expires = now() + INTERVAL '37 minute'
-      WHERE session = c_session AND expires > now() RETURNING * INTO s;
-      SELECT * FROM auser WHERE id = s.user_id INTO u;
-    END IF;
-
-    -- map session and user
-    IF s IS NOT NULL THEN
-      rs = json_build_session(s, u);
-    END IF;
-
-    -- fetch globals
+    -- fetch globals, session and user info
     SELECT * FROM globals() INTO STRICT g;
+    SELECT * FROM refresh_session(c_session) INTO STRICT s;
+    IF s IS NOT NULL THEN
+      SELECT * FROM auser WHERE id = s.user_id INTO STRICT u;
+      rs := json_build_session(s, u);
+    END IF;
 
-    -- fetch route
+    -- fetch and authorize route
     SELECT * FROM route WHERE method = c_method::method AND c_path ~ match INTO STRICT r;
     IF r.legitimate @> '{"every"}' THEN
       authorized := true;
@@ -320,9 +326,9 @@ $$ LANGUAGE plpgsql;
 
 -- API routes
 INSERT INTO route (method, path, proc, legitimate, description) VALUES
-('get' , '/login'    , 'form_login'   , '{"every"}', 'login form'),
-('get' , '/routes'   , 'get_routes'   , '{"admin"}', 'list all published routes'),
-('get' , '/templates', 'get_templates', '{"admin"}', 'list all published templates');
+('get', '/login'    , 'form_login'   , '{"every"}', 'login form'),
+('get', '/routes'   , 'get_routes'   , '{"admin"}', 'list all published routes'),
+('get', '/templates', 'get_templates', '{"admin"}', 'list all published templates');
 
 -- API templates
 INSERT INTO template (proc, mime, path, locals) VALUES
@@ -379,17 +385,18 @@ $$ LANGUAGE plpgsql;
 
 -- HTTP auth logout request
 CREATE FUNCTION public.post_logout(c_session uuid)
-  RETURNS response AS $$
+  RETURNS http_response AS $$ DECLARE g json;
   BEGIN
+    SELECT * FROM globals() INTO STRICT g;
     PERFORM logout(c_session);
-    RETURN (200, json_build_object(
+    RETURN (200, g, NULL::json, json_build_object(
       'notice', json_build_object('level', 'info', 'message', 'logged out')
     , 'routes', json_build_object('login', route_action('get', 'form_login')))
     );
   EXCEPTION
     WHEN no_data_found THEN
       RAISE NOTICE 'logout failed %', to_json((SQLSTATE, SQLERRM)::error);
-      RETURN (400, to_json((400, 'logout failed')::error))::response;
+      RETURN (400, g, NULL::json, to_json((400, 'logout failed')::error))::http_response;
   END;
 $$ LANGUAGE plpgsql
    -- Everybody can try a logout!
