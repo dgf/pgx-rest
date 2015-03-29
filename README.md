@@ -22,7 +22,7 @@ Define a database name in the Makefile or use `rest_check` (the default).
 create a fresh database and load required contrib modules
 ```sh
 $ make init
-$ make setup
+$ make pg-setup
 ```
 
 create example application
@@ -148,6 +148,9 @@ SELECT * FROM get('/entities');
 ## HTTP endpoints with OpenResty
 
 Download, build and install an [OpenResty][openresty] release.
+```sh
+$ make ng-install
+```
 
 create an application user with login
 ```SQL
@@ -163,7 +166,7 @@ $ grep postgres_server nginx.conf
 
 start Nginx
 ```sh
-$ nginx -p `pwd`/ -c nginx.conf
+$ make ng-run
 ``` 
 
 a simple task flow example session
