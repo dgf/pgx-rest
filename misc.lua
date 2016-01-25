@@ -63,10 +63,15 @@ function db_capture(query)
   return body.resultset[1]
 end
 
--- export misc functions
+-- export misc functions and configuration
 return {
   capture = db_capture,
   error = render_error,
-  starts_with = starts_with
+  starts_with = starts_with,
+  mime_types = {
+    form = "application/x-www-form-urlencoded",
+    html = "text/html",
+    json = "application/json",
+    svg = "image/svg+xml"
+  }
 }
-

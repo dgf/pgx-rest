@@ -25,6 +25,7 @@ if response.code ~= 200 then
   if string.find(ngx.req.get_headers().accept, "text/html") then
     misc.error(response)
   else -- return JSON
+    ngx.header["Content-Type"] = misc.mime_types.json
     ngx.status = response.code
     ngx.print(response.session)
     ngx.print(response.data)
@@ -34,7 +35,7 @@ if response.code ~= 200 then
 else
   local data = cjson.decode(response.data)
   ngx.status = response.code
+  ngx.header["Content-Disposition"] = "attachment; filename=" .. data.name
   ngx.header["Content-Type"] = data.mime
   ngx.say(ngx.decode_base64(data.data))
 end
-

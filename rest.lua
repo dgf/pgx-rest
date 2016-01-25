@@ -6,14 +6,6 @@ local cjson = require("cjson.safe")
 local rparser = require("rds.parser")
 local rtemplate = require("resty.template")
 
--- configuration
-local mime_types = {
-  form = "application/x-www-form-urlencoded",
-  html = "text/html",
-  json = "application/json",
-  svg = "image/svg+xml"
-}
-
 -- get uri, headers, method, ...
 local accept = ngx.req.get_headers().accept
 local body = "{}" -- default body is empty
@@ -31,12 +23,12 @@ end
 if method == "post" or method == "put" then
 
   -- read JSON body
-  if ctype == mime_types.json  then
+  if ctype == misc.mime_types.json  then
     ngx.req.read_body()
     body = ngx.req.get_body_data()
 
   -- encode HTML form requests
-  elseif ctype == mime_types.form then
+  elseif ctype == misc.mime_types.form then
     ngx.req.read_body()
     local pargs = ngx.req.get_post_args()
     body = cjson.encode(pargs)
@@ -59,8 +51,8 @@ end
 
 -- test mime type
 local mime = "json" -- default accept mime is JSON
-if string.find(accept, mime_types.html) then mime = 'html' end
-if string.find(accept, mime_types.svg) then mime = 'svg' end
+if string.find(accept, misc.mime_types.html) then mime = 'html' end
+if string.find(accept, misc.mime_types.svg) then mime = 'svg' end
 
 -- extract session ID from cookie string
 local session_id = "NULL"
@@ -119,7 +111,7 @@ elseif response.code >= 400 then
   misc.error(response)
 
 -- rewrite successful POST requests
-elseif method == "post" and response.code < 300 and ctype == mime_types.form then
+elseif method == "post" and response.code < 300 and ctype == misc.mime_types.form then
   local data = cjson.decode(response.data)
   ngx.status = 303 -- redirect POST response
 
@@ -133,7 +125,7 @@ elseif method == "post" and response.code < 300 and ctype == mime_types.form the
   end
 
 -- rewrite successful DELETE requests
-elseif method == "delete" and response.code < 300 and ctype == mime_types.form then
+elseif method == "delete" and response.code < 300 and ctype == misc.mime_types.form then
   local data = cjson.decode(response.data)
   ngx.status = 303 -- redirect DELETE response
   ngx.header.location = data.routes.next
@@ -173,7 +165,7 @@ else
     end
 
     -- set headers and render template
-    ngx.header.content_type = mime_types[mime]
+    ngx.header.content_type = misc.mime_types[mime]
     ngx.status = response.code
     rtemplate.render(template.path, value)
   end
