@@ -9,13 +9,48 @@ nginx = /usr/local/openresty/nginx/sbin/nginx
 # helper
 
 targets:                # list all targets
-	@grep '^[^#[:space:]].*:' Makefile
+	@grep '^[^#[:space:]].*:.*#' Makefile
+
+cli:                    # connect Postgres terminal
+	psql $(db_name)
+
+# modules
+
+tasks: rest
+	psql $(db_name) -f modules/tasks.sql
+
+files: rest
+	psql $(db_name) -f modules/files.sql
+
+contacts: rest
+	psql $(db_name) -f modules/contacts.sql
+
+app: files tasks contacts
+	psql $(db_name) -f modules/application.sql
+
+# base
+
+clean:                  # clean database
+	psql $(db_name) -f clean.sql
+
+rest: clean             # install REST schema
+	psql $(db_name) -f rest.sql
+
+install: rest app       # install example application
+# testing
+
+SPECS = rest files tasks contacts application
+
+test: application       # run specifications
+	$(foreach spec, $(SPECS), psql $(db_name) -f specs/$(spec).sql 2>&1 | ./reporter.awk;)
+
+# setup
 
 init:                   # create database
 	createdb $(db_name)
 
-cli:                    # connect Postgres terminal
-	psql $(db_name)
+pg-setup:               # setup Postgres extensions
+	psql $(db_name) -f setup.sql
 
 ng-download:            # fetch and unpack Nginx
 	cd build && \
@@ -58,34 +93,3 @@ ng-install: ng-compile  # install Nginx
 
 ng-run:                 # start Nginx
 	${nginx} -p `pwd`/ -c nginx.conf
-
-pg-setup:               # setup Postgres extensions
-	psql $(db_name) -f setup.sql
-
-# base
-
-clean:                  # clean database
-	psql $(db_name) -f clean.sql
-
-rest: clean             # install REST schema
-	psql $(db_name) -f rest.sql
-
-# testing
-SPECS = rest files tasks contacts application
-
-test: application       # run specifications
-	$(foreach spec, $(SPECS), psql $(db_name) -f specs/$(spec).sql 2>&1 | ./reporter.awk;)
-
-# modules
-
-tasks: rest
-	psql $(db_name) -f modules/tasks.sql
-
-files: rest
-	psql $(db_name) -f modules/files.sql
-
-contacts: rest
-	psql $(db_name) -f modules/contacts.sql
-
-application: files tasks contacts
-	psql $(db_name) -f modules/application.sql

@@ -1,7 +1,6 @@
 # REST on PostgreSQL
 
-This is a test implementation of REST compatible endpoints with PostgreSQL functions.
-And yes, it feels right! IMO there is no better solution to achieve this.
+Test implementation of REST compatible endpoints with PostgreSQL functions.
 
 To start a ROCA based application, with a backend like this, you only need an
 environment with a HTTP server and a PostgreSQL interface - that's it!
@@ -10,7 +9,7 @@ Requirements: only PostgreSQL 9.4 or higher
 
 ## Installation
 
-To install an actual [PostgreSQL][postgres] on Ubuntu or Debian follow these [instructions][pg_apt]
+To install [PostgreSQL][postgres] on Ubuntu or Debian follow these [instructions][pg_apt]
 and use a tagged repository to overrule the libpg version.
 
     deb http://apt.postgresql.org/pub/repos/apt/ precise-pgdg main 9.4
@@ -33,17 +32,17 @@ $ make application
 list all existing targets
 ```sh
 $ make
-targets:	# list all targets
-init: 		# create database
-cli: 		# connect Postgres terminal
-setup:		# setup Postgres extensions
-clean:		# clean database
-rest: clean	# install REST schema
-test: application # run specifations
-tasks: rest
-files: rest
-contacts: rest
-application: files tasks contacts
+targets:                # list all targets
+init:                   # create database
+cli:                    # connect Postgres terminal
+ng-download:            # fetch and unpack Nginx
+ng-compile: ng-download # compile Nginx
+ng-install: ng-compile  # install Nginx
+ng-run:                 # start Nginx
+pg-setup:               # setup Postgres extensions
+clean:                  # clean database
+rest: clean             # install REST schema
+test: application       # run specifications
 ```
 
 ## Usage
