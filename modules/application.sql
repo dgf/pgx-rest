@@ -13,10 +13,15 @@ INSERT INTO route (method, path, proc, description) VALUES
 CREATE FUNCTION homepage(req request)
   RETURNS response AS $$ DECLARE tasks json; contacts json;
   BEGIN
+
+    -- open tasks
     SELECT json_agg(json_build_object('id', t.id, 'subject', t.subject))
     FROM task t WHERE status = 'open' INTO tasks;
+
+    -- contact list
     SELECT json_agg(json_build_object('id', c.id, 'name', c.name, 'address', concat_ws(' ', a.street, a.zip, a.city)))
     FROM contact c JOIN address a ON c.address_id = a.id INTO contacts;
+
     RETURN (200, json_build_object('contacts', contacts, 'tasks', tasks));
   EXCEPTION
     WHEN no_data_found THEN
@@ -43,4 +48,3 @@ $$ LANGUAGE plpgsql;
 -- create default users
 SELECT add_user('icke', 'secret', 'an admin', '{"admin","user"}');
 SELECT add_user('er', 'secret', 'an user', '{"user"}');
-
