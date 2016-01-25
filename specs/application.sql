@@ -1,6 +1,6 @@
 -- example application specification
 
--- requires all module paths of globals() call
+-- requires all module paths of rest.globals() call
 SET search_path TO application, tasks, contacts, files, rest, public;
 
 BEGIN TRANSACTION;
