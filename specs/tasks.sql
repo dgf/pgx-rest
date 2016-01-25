@@ -175,6 +175,29 @@ DO $$
     END;
 
     BEGIN
+      RAISE INFO 'TEST: DELETE 403 /task';
+      SELECT * FROM delete('/task/'||(ref->>'id'), sid) INTO res;
+      IF res.code = 403 THEN
+        RAISE INFO 'OK: % %', res.code, res.data;
+      ELSE
+        RAISE 'forbitten call expected, got: % %', res.code, res.data;
+      END IF;
+    END;
+
+    BEGIN
+      RAISE INFO 'TEST: POST 200 /postlogin as admin';
+      SELECT * FROM post_login('icke', 'secret') INTO STRICT res;
+      IF res.code = 200 AND res.session->>'user' = 'icke' THEN
+        RAISE INFO 'OK: % %', res.code, res.data;
+      ELSE
+        RAISE 'session expected, got: % % %', res.code, res.session, res.data;
+      END IF;
+    END;
+
+    -- reference admin session
+    sid := res.session->>'id';
+
+    BEGIN
       RAISE INFO 'TEST: DELETE 204 /task';
       SELECT * FROM delete('/task/'||(ref->>'id'), sid) INTO res;
       IF res.code = 204 THEN
