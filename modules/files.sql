@@ -4,12 +4,12 @@ SET search_path TO files, rest, public;
 
 -- file routes
 INSERT INTO route (method, path, proc, legitimate, description) VALUES
-('delete', '/file/{id}'       , 'delete_file'     , '{"every"}', 'delete a file'),
-('get'   , '/file'            , 'form_upload'     , '{"every"}', 'file upload form'),
-('get'   , '/file/{id}/delete', 'form_delete_file', '{"every"}', 'confirm file delete'),
+('delete', '/file/{id}'       , 'delete_file'     , '{"user"}' , 'delete a file'),
+('get'   , '/file'            , 'form_upload'     , '{"user"}' , 'file upload form'),
+('get'   , '/file/{id}/delete', 'form_delete_file', '{"user"}' , 'confirm file delete'),
 ('get'   , '/file/{id}'       , 'get_file'        , '{"every"}', 'file details page'),
 ('get'   , '/files'           , 'get_files'       , '{"every"}', 'file list'),
-('put'   , '/file/{id}'       , 'put_file'        , '{"every"}', 'update file meta data');
+('put'   , '/file/{id}'       , 'put_file'        , '{"user"}' , 'update file meta data');
 
 -- file templates
 INSERT INTO template (proc, mime, path, locals) VALUES
@@ -38,14 +38,15 @@ CREATE FUNCTION json_build_file(f afile)
     , 'mime', f.mime
     , 'description', f.description
     , 'routes', json_build_object(
-        'get', route_action('get', 'get_file', ref)
-      , 'delete', route_action('delete', 'delete_file', ref)
-      , 'download', '/download/'||f.id)
+        'delete', route_action('delete', 'delete_file', ref)
+      , 'download', '/download/'||f.id
+      , 'get', route_action('get', 'get_file', ref)
+      , 'put', route_action('put', 'put_file', ref))
     );
   END;
 $$ LANGUAGE plpgsql;
 
--- public HTML form data upload
+-- public form data upload
 CREATE FUNCTION public.upload(c_session uuid, f_name text, f_mime text, f_description text, f_data text)
   RETURNS http_response AS $$
   DECLARE
