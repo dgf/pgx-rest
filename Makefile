@@ -1,6 +1,6 @@
 # configuration
 db_name = rest_check
-ng_version = 1.7.10.1
+ng_version = 1.9.7.2
 
 # commands
 curl = /usr/bin/curl
@@ -41,7 +41,7 @@ install: rest app       # install example application
 
 SPECS = rest files tasks contacts application
 
-test: application       # run specifications
+test: app               # run specifications
 	$(foreach spec, $(SPECS), psql $(db_name) -f specs/$(spec).sql 2>&1 | ./reporter.awk;)
 
 # setup
