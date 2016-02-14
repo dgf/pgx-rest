@@ -97,7 +97,7 @@ SELECT data FROM post('/task', '{"subject": "todo", "description": "something"}'
 
  * generic route execution: ```SELECT * FROM call('get', '/tasks', NULL, NULL);```
  * template resolver: ```SELECT * FROM find_template('html', '/tasks');```
- * HTTP basic login: ```SELECT * FROM login('icke', encode(concat_ws(':', u_login, u_password)::bytea, 'base64'));```
+ * HTTP basic login: ```SELECT * FROM login('icke', encode(concat_ws(':', 'icke', 'secret')::bytea, 'base64'));```
  * HTML form POST login: ```SELECT * FROM post_login('icke', 'secret');```
  * HTTP logout POST route: ```SELECT * FROM post_logout(sid);```
 
