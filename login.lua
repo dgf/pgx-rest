@@ -1,7 +1,12 @@
 -- /authenticate POST
+
+-- requirements
 local misc = require("misc")
 local cjson = require("cjson.safe")
 local rparser = require("rds.parser")
+
+-- get mime type
+local mime = misc.map_mime()
 
 -- only accept POST request
 if string.lower(ngx.req.get_method()) ~= "post" then
@@ -11,23 +16,22 @@ end
 -- get POST args or body data
 ngx.req.read_body()
 local body = ngx.req.get_post_args()
-if ngx.req.get_headers().content_type ~= "application/x-www-form-urlencoded" then
-  body = ngx.req.get_body_data()
+if ngx.req.get_headers().content_type ~= misc.mime_types.form then
+  body = cjson.decode(ngx.req.get_body_data())
 end
 
 -- query login function (with plain password)
 local sql = "SELECT * FROM post_login('%s'::text, '%s'::text)"
 local query = string.format(sql, body.login, body.password)
-local response = misc.capture(query)
+local response = misc.db_capture(query)
 
 -- login failed
 if response.code ~= 200 then
-  if string.find(ngx.req.get_headers().accept, "text/html") then
-    misc.error(response)
-  else -- return JSON
+  if mime == "json" then
     ngx.status = response.code
-    ngx.print(response.session)
     ngx.print(response.data)
+  else
+    misc.render_error(response)
   end
 
 -- authenticated
@@ -37,7 +41,7 @@ else
   ngx.header["Set-Cookie"] = "session=" .. session.id .. "; Path=/; Expires=" .. ngx.cookie_time(session.epoch)
 
   -- return JSON
-  if string.find(ngx.req.get_headers().accept, "application/json") then
+  if mime == "json" then
     ngx.status = response.code
     ngx.print(response.data)
 
@@ -50,6 +54,7 @@ else
 
     -- redirect back
     ngx.status = 303
+    ngx.header.content_type = misc.mime_types.html
     ngx.header.location = referer
   end
 end

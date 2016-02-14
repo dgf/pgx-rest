@@ -4,19 +4,21 @@
 local misc = require("misc")
 local cjson = require("cjson.safe")
 local rparser = require("rds.parser")
-local rtemplate = require("resty.template")
 
 -- get uri, headers, method, ...
-local accept = ngx.req.get_headers().accept
 local body = "{}" -- default body is empty
 local ctype = ngx.req.get_headers().content_type
 local method = string.lower(ngx.req.get_method())
-local referer = ngx.req.get_headers().referer
 local uri = ngx.var.request_uri
 
--- fix referer
+-- get mime type and session
+local mime = misc.map_mime()
+local session_id = misc.check_login(mime)
+
+-- get referer
+local referer = ngx.req.get_headers().referer
 if not referer or referer == "" then
-  referer = "/" -- defaults to index page
+  referer = "/" -- defaults to index
 end
 
 -- content type specific body handling
@@ -25,7 +27,7 @@ if method == "post" or method == "put" then
   -- read JSON body
   if ctype == misc.mime_types.json  then
     ngx.req.read_body()
-    body = ngx.req.get_body_data()
+    body = ngx.req.get_body_data() or "{}"
 
   -- encode HTML form requests
   elseif ctype == misc.mime_types.form then
@@ -45,61 +47,18 @@ if method == "post" or method == "put" then
 
   -- unsupported call, e.g. post multipart/form-data
   else
-    -- ignore it
-  end
-end
-
--- test mime type
-local mime = "json" -- default accept mime is JSON
-if string.find(accept, misc.mime_types.html) then mime = 'html' end
-if string.find(accept, misc.mime_types.svg) then mime = 'svg' end
-
--- extract session ID from cookie string
-local session_id = "NULL"
-if ngx.var.cookie_session then
-  session_id = string.gsub(ngx.var.cookie_session, "(%a+),", "%1")
-end
-
--- HTTP basic auth request
-if session_id == "NULL" and ngx.var.remote_user then
-
-  -- query login function
-  local auth_sql = "SELECT * FROM login('%s'::text, '%s'::text)"
-  local password64b = string.gsub(ngx.var.http_authorization, "Basic (%a+)", "%1")
-  local auth_query = string.format(auth_sql, ngx.var.remote_user, password64b)
-  local auth_response = misc.capture(auth_query)
-
-  -- login failed
-  if auth_response.code ~= 200 then
-    if mime == "json" then
-      ngx.status = auth_response.code
-      ngx.print(auth_response.data)
-    else
-      misc.error(auth_response)
-    end
-    ngx.exit(auth_response.code)
-
-  -- authenticated
-  else
-    local auth_session = cjson.decode(auth_response.session)
-    session_id = auth_session.id -- reassign session ID
+    -- TBD ignore it or throw error?
   end
 end
 
 -- create and execute route call query
 -- This query construction is secure as long as the application has only access to the "call" route function!
-if session_id ~= "NULL" then session_id = "'" .. session_id .. "'" end
 local route_call_sql = "SELECT * FROM call('%s'::text, '%s'::text, %s::uuid, '%s'::json)"
 local route_call_query = string.format(route_call_sql, method, uri, session_id, body)
-local response = misc.capture(route_call_query)
+local response = misc.db_capture(route_call_query)
 
--- update session cookie
-local session = cjson.decode(response.session)
-if session and session ~= cjson.null then
-  ngx.header["Set-Cookie"] = "session=" .. session.id .. "; Path=/; Expires=" .. ngx.cookie_time(session.epoch)
-else -- invalidate session
-  ngx.header["Set-Cookie"] = "session=NULL; Path=/; Expires=" .. ngx.cookie_time(ngx.time())
-end
+-- update session
+local session = misc.update_session(response)
 
 -- return JSON
 if mime == "json" then
@@ -108,12 +67,11 @@ if mime == "json" then
 
 -- check error codes
 elseif response.code >= 400 then
-  misc.error(response)
+  misc.render_error(response)
 
 -- rewrite successful POST requests
 elseif method == "post" and response.code < 300 and ctype == misc.mime_types.form then
   local data = cjson.decode(response.data)
-  ngx.status = 303 -- redirect POST response
 
   -- use optional response GET route
   if data.routes and data.routes.get then
@@ -124,17 +82,22 @@ elseif method == "post" and response.code < 300 and ctype == misc.mime_types.for
     ngx.header.location = referer
   end
 
+  ngx.header.content_type = misc.mime_types[mime]
+  ngx.status = 303 -- redirect POST response
+
 -- rewrite successful DELETE requests
 elseif method == "delete" and response.code < 300 and ctype == misc.mime_types.form then
   local data = cjson.decode(response.data)
-  ngx.status = 303 -- redirect DELETE response
   ngx.header.location = data.routes.next
+
+  ngx.header.content_type = misc.mime_types[mime]
+  ngx.status = 303 -- redirect DELETE response
 
 -- query and render template
 else
   local template_call_sql = "SELECT * FROM find_template('%s'::text, '%s'::text)"
   local template_call_query = string.format(template_call_sql, mime, uri)
-  local template = misc.capture(template_call_query)
+  local template = misc.db_capture(template_call_query)
 
   -- no template found > return JSON
   if template.path == rparser.null then
@@ -147,7 +110,7 @@ else
     value.data = cjson.decode(response.data)
 
     -- add session object
-    if session ~= cjson.null then
+    if session and session ~= cjson.null then
       value.session = session
     end
 
@@ -167,7 +130,7 @@ else
     -- set headers and render template
     ngx.header.content_type = misc.mime_types[mime]
     ngx.status = response.code
-    rtemplate.render(template.path, value)
+    require("resty.template").render(template.path, value)
   end
 end
 
