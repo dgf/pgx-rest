@@ -3,11 +3,11 @@ CREATE SCHEMA application;
 SET search_path TO application, tasks, contacts, files, rest, public;
 
 -- predefine application settings
-INSERT INTO asetting (app_name, globals) VALUES
-('pgx-rest', 'get_configuration');
+INSERT INTO app_settings (schema, name, globals) VALUES
+('application', 'Example Application', 'get_configuration');
 
-INSERT INTO route (method, path, proc, description) VALUES
-('get', '/', 'homepage', 'index page');
+INSERT INTO route (method, path, schema, proc, description) VALUES
+('get', '/', 'application', 'homepage', 'index page');
 
 -- public index route
 CREATE FUNCTION homepage(req request)
@@ -30,11 +30,12 @@ CREATE FUNCTION homepage(req request)
 $$ LANGUAGE plpgsql;
 
 -- create globals
-CREATE FUNCTION get_configuration(s asetting)
-  RETURNS json AS $$
+CREATE FUNCTION get_configuration()
+  RETURNS json AS $$ DECLARE s app_settings;
   BEGIN
+    SELECT * FROM app_settings INTO STRICT s;
     RETURN json_build_object(
-      'app_name', s.app_name
+      'app_name', s.name
     , 'open_tasks', get_open_tasks()
     , 'routes', json_build_object(
         'index', route_action('get', 'homepage')

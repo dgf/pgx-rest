@@ -3,13 +3,13 @@ CREATE SCHEMA files;
 SET search_path TO files, rest, public;
 
 -- file routes
-INSERT INTO route (method, path, proc, legitimate, description) VALUES
-('delete', '/file/{id}'       , 'delete_file'     , '{"user"}' , 'delete a file'),
-('get'   , '/file'            , 'form_upload'     , '{"user"}' , 'file upload form'),
-('get'   , '/file/{id}/delete', 'form_delete_file', '{"user"}' , 'confirm file delete'),
-('get'   , '/file/{id}'       , 'get_file'        , '{"every"}', 'file details page'),
-('get'   , '/files'           , 'get_files'       , '{"every"}', 'file list'),
-('put'   , '/file/{id}'       , 'put_file'        , '{"user"}' , 'update file meta data');
+INSERT INTO route (method, path, schema, proc, legitimate, description) VALUES
+('delete', '/file/{id}'       , 'files', 'delete_file'     , '{"user"}' , 'delete a file'),
+('get'   , '/file'            , 'files', 'form_upload'     , '{"user"}' , 'file upload form'),
+('get'   , '/file/{id}/delete', 'files', 'form_delete_file', '{"user"}' , 'confirm file delete'),
+('get'   , '/file/{id}'       , 'files', 'get_file'        , '{"every"}', 'file details page'),
+('get'   , '/files'           , 'files', 'get_files'       , '{"every"}', 'file list'),
+('put'   , '/file/{id}'       , 'files', 'put_file'        , '{"user"}' , 'update file meta data');
 
 -- file templates
 INSERT INTO template (proc, mime, path, locals) VALUES
@@ -21,7 +21,7 @@ INSERT INTO template (proc, mime, path, locals) VALUES
 -- file store
 CREATE TABLE afile (
   id          serial  PRIMARY KEY,
-  user_id     int     NOT NULL REFERENCES auser, -- owner
+  user_id     int     NOT NULL REFERENCES app_user, -- owner
   name        text    NOT NULL, -- file name
   mime        text    NOT NULL, -- mime type
   description text    NOT NULL DEFAULT '',
@@ -48,13 +48,13 @@ $$ LANGUAGE plpgsql;
 
 -- public form data upload
 CREATE FUNCTION public.upload(c_session uuid, f_name text, f_mime text, f_description text, f_data text)
-  RETURNS http_response AS $$
+  RETURNS app_response AS $$
   DECLARE
-    f afile; s asession; u auser;
+    f afile; s session; u app_user;
     g json; rs json;
   BEGIN
     -- fetch globals and session
-    SELECT * FROM globals() INTO STRICT g;
+    SELECT * FROM app_globals() INTO STRICT g;
     SELECT * FROM refresh_session(c_session) INTO STRICT s;
 
     -- unauthenticated
@@ -64,7 +64,7 @@ CREATE FUNCTION public.upload(c_session uuid, f_name text, f_mime text, f_descri
     -- authenticated
     ELSE
       -- serialize session and user info
-      SELECT * FROM auser WHERE id = s.user_id INTO STRICT u;
+      SELECT * FROM app_user WHERE id = s.user_id INTO STRICT u;
       rs := json_build_session(s, u);
 
       -- create file
@@ -83,13 +83,13 @@ $$ LANGUAGE plpgsql
 
 -- public HTTP download file data
 CREATE FUNCTION public.download(c_session uuid, f_id int)
-  RETURNS http_response AS $$
+  RETURNS app_response AS $$
   DECLARE
-    f afile; s asession; u auser;
+    f afile; s session; u app_user;
     g json; rs json;
   BEGIN
     -- fetch globals and session
-    SELECT * FROM globals() INTO STRICT g;
+    SELECT * FROM app_globals() INTO STRICT g;
     SELECT * FROM refresh_session(c_session) INTO STRICT s;
 
     -- unauthenticated
@@ -99,7 +99,7 @@ CREATE FUNCTION public.download(c_session uuid, f_id int)
     -- authenticated
     ELSE
       -- serialize session and user info
-      SELECT * FROM auser WHERE id = s.user_id INTO STRICT u;
+      SELECT * FROM app_user WHERE id = s.user_id INTO STRICT u;
       rs := json_build_session(s, u);
  
       -- query file with data
@@ -125,10 +125,10 @@ CREATE FUNCTION delete_file(req request)
 $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION get_file(req request)
-  RETURNS response AS $$ DECLARE f afile; u auser;
+  RETURNS response AS $$ DECLARE f afile; u app_user;
   BEGIN
     SELECT * FROM afile WHERE id::text = req.params->>'id' INTO STRICT f;
-    SELECT * FROM auser WHERE id = f.user_id INTO STRICT u;
+    SELECT * FROM app_user WHERE id = f.user_id INTO STRICT u;
     RETURN (200, json_build_object(
       'file', json_build_file(f)
     , 'owner', u.login)
@@ -149,11 +149,11 @@ CREATE FUNCTION get_files(req request)
 $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION put_file(req request)
-  RETURNS response AS $$ DECLARE f afile; u auser;
+  RETURNS response AS $$ DECLARE f afile; u app_user;
   BEGIN
     UPDATE afile SET name = req.body->>'name', description = req.body->>'description'
     WHERE id::text = req.params->>'id' RETURNING * INTO STRICT f;
-    SELECT * FROM auser WHERE id = f.user_id INTO STRICT u;
+    SELECT * FROM app_user WHERE id = f.user_id INTO STRICT u;
     RETURN (200, json_build_object(
       'file', json_build_file(f)
     , 'owner', u.login

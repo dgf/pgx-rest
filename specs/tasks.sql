@@ -6,9 +6,9 @@ SET search_path TO application, tasks, contacts, files, rest, public;
 BEGIN TRANSACTION;
 DO $$
   DECLARE -- references to work with
-    ref json;          -- an JSON object
-    sid uuid;          -- an user session
-    res http_response; -- a function result
+    ref json;         -- JSON object
+    sid uuid;         -- user session
+    res app_response; -- function result
   BEGIN
 
     BEGIN

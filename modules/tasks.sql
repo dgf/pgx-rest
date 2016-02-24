@@ -3,21 +3,21 @@ CREATE SCHEMA tasks;
 SET search_path TO tasks, rest, public;
 
 -- define routes
-INSERT INTO route (method, path, proc, legitimate, description) VALUES
-('get'   , '/task'                 , 'form_post_task'       , '{"every"}', 'template route of task creation form'),
-('get'   , '/tasks'                , 'get_tasks'            , '{"every"}', 'all tasks'),
-('get'   , '/tasks?status={status}', 'get_tasks'            , '{"every"}', 'filter tasks'),
-('get'   , '/task/{id}'            , 'get_task'             , '{"every"}', 'get task details'),
-('post'  , '/task'                 , 'post_task'            , '{"every"}', 'create a task'),
-('delete', '/task/{id}'            , 'delete_task'          , '{"admin"}', 'delete a task'),
-('get'   , '/task/{id}/cancel'     , 'form_post_task_cancel', '{"user"}' , 'confirm task cancel'),
-('get'   , '/task/{id}/delete'     , 'form_delete_task'     , '{"admin"}', 'confirm task delete'),
-('get'   , '/task/{id}/finish'     , 'form_post_task_finish', '{"user"}' , 'confirm task finish'),
-('get'   , '/task/{id}/reopen'     , 'form_post_task_reopen', '{"user"}' , 'confirm task reopen'),
-('post'  , '/task/{id}/cancel'     , 'post_task_cancel'     , '{"user"}' , 'cancel a task'),
-('post'  , '/task/{id}/finish'     , 'post_task_finish'     , '{"user"}' , 'finish a task'),
-('post'  , '/task/{id}/reopen'     , 'post_task_reopen'     , '{"user"}' , 'reopen a task'),
-('put'   , '/task/{id}'            , 'put_task'             , '{"user"}' , 'update a task');
+INSERT INTO route (method, path, schema, proc, legitimate, description) VALUES
+('get'   , '/task'                 , 'tasks', 'form_post_task'       , '{"every"}', 'template route of task creation form'),
+('get'   , '/tasks'                , 'tasks', 'get_tasks'            , '{"every"}', 'all tasks'),
+('get'   , '/tasks?status={status}', 'tasks', 'get_tasks'            , '{"every"}', 'filter tasks'),
+('get'   , '/task/{id}'            , 'tasks', 'get_task'             , '{"every"}', 'get task details'),
+('post'  , '/task'                 , 'tasks', 'post_task'            , '{"every"}', 'create a task'),
+('delete', '/task/{id}'            , 'tasks', 'delete_task'          , '{"admin"}', 'delete a task'),
+('get'   , '/task/{id}/cancel'     , 'tasks', 'form_post_task_cancel', '{"user"}' , 'confirm task cancel'),
+('get'   , '/task/{id}/delete'     , 'tasks', 'form_delete_task'     , '{"admin"}', 'confirm task delete'),
+('get'   , '/task/{id}/finish'     , 'tasks', 'form_post_task_finish', '{"user"}' , 'confirm task finish'),
+('get'   , '/task/{id}/reopen'     , 'tasks', 'form_post_task_reopen', '{"user"}' , 'confirm task reopen'),
+('post'  , '/task/{id}/cancel'     , 'tasks', 'post_task_cancel'     , '{"user"}' , 'cancel a task'),
+('post'  , '/task/{id}/finish'     , 'tasks', 'post_task_finish'     , '{"user"}' , 'finish a task'),
+('post'  , '/task/{id}/reopen'     , 'tasks', 'post_task_reopen'     , '{"user"}' , 'reopen a task'),
+('put'   , '/task/{id}'            , 'tasks', 'put_task'             , '{"user"}' , 'update a task');
 
 -- map templates
 INSERT INTO template (proc, mime, path, locals) VALUES

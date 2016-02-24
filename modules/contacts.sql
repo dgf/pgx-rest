@@ -2,13 +2,13 @@
 CREATE SCHEMA contacts;
 SET search_path TO contacts, rest, public;
 
-INSERT INTO route (method, path, proc, description) VALUES
-('delete' , '/contact/{id}'          , 'delete_contact'      , 'delete a contact'),
-('get'    , '/contact/{id}'          , 'get_contact'         , 'contact details'),
-('get'    , '/contacts'              , 'get_contacts'        , 'contact list'),
-('post'   , '/contact'               , 'post_contact'        , 'create a contact'),
-('put'    , '/contact/{id}/address'  , 'put_contact_address' , 'update contact address'),
-('put'    , '/contact/{id}'          , 'put_contact'         , 'update contact details');
+INSERT INTO route (method, path, schema, proc, description) VALUES
+('delete', '/contact/{id}'        , 'contacts', 'delete_contact'     , 'delete a contact'),
+('get'   , '/contact/{id}'        , 'contacts', 'get_contact'        , 'contact details'),
+('get'   , '/contacts'            , 'contacts', 'get_contacts'       , 'contact list'),
+('post'  , '/contact'             , 'contacts', 'post_contact'       , 'create a contact'),
+('put'   , '/contact/{id}/address', 'contacts', 'put_contact_address', 'update contact address'),
+('put'   , '/contact/{id}'        , 'contacts', 'put_contact'        , 'update contact details');
 
 CREATE TABLE address (
   id          serial PRIMARY KEY,

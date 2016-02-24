@@ -6,9 +6,9 @@ SET search_path TO application, tasks, contacts, files, rest, public;
 BEGIN TRANSACTION;
 DO $$
   DECLARE -- references to work with
-    ref json;          -- an JSON object
-    sid uuid;          -- an user session
-    res http_response; -- a function result
+    ref json;         -- JSON object
+    sid uuid;         -- user session
+    res app_response; -- function result
   BEGIN
 
     BEGIN
@@ -103,7 +103,7 @@ DO $$
     BEGIN
       RAISE INFO 'TEST: GET 401 /routes expired';
       -- update session expiration
-      UPDATE asession SET expires = now() - INTERVAL '1 minute' WHERE session = sid;
+      UPDATE session SET expires = now() - INTERVAL '1 minute' WHERE uuid = sid;
       -- use expired session
       SELECT * FROM get('/routes', sid) INTO STRICT res;
       IF res.code = 401
@@ -118,7 +118,7 @@ DO $$
     BEGIN
       RAISE INFO 'TEST: logout admin session';
       SELECT to_json(logout(sid)) INTO STRICT ref;
-      IF length(ref->>'session') = 36 THEN
+      IF length(ref->>'uuid') = 36 THEN
         RAISE INFO 'OK: %', ref;
       ELSE
         RAISE 'session expected, got: %', ref;
