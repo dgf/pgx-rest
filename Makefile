@@ -14,6 +14,14 @@ targets:                # list all targets
 cli:                    # connect Postgres terminal
 	psql $(db_name)
 
+# base
+
+clean:                  # clean database
+	psql $(db_name) -f clean.sql
+
+rest: clean             # install REST schema
+	psql $(db_name) -f rest.sql
+
 # modules
 
 tasks: rest
@@ -28,20 +36,13 @@ contacts: rest
 app: files tasks contacts
 	psql $(db_name) -f modules/application.sql
 
-# base
-
-clean:                  # clean database
-	psql $(db_name) -f clean.sql
-
-rest: clean             # install REST schema
-	psql $(db_name) -f rest.sql
-
 install: rest app       # install example application
+
 # testing
 
 SPECS = rest files tasks contacts application
 
-test: app               # run specifications
+test: install           # run specifications
 	$(foreach spec, $(SPECS), psql $(db_name) -f specs/$(spec).sql 2>&1 | ./reporter.awk;)
 
 # setup
@@ -93,3 +94,4 @@ ng-install: ng-compile  # install Nginx
 
 ng-run:                 # start Nginx
 	${nginx} -p `pwd`/ -c nginx.conf
+
